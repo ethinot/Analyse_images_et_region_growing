@@ -24,12 +24,12 @@ void framing(unsigned int im_width, unsigned int im_height, int& num_case_w, int
 std::pair<int, int> rand_germ_position(int num_case_w, int num_case_h, int case_width, int case_height)
 {
     std::mt19937 generator{ std::random_device{}() };
-    std::uniform_int_distribution<> distribNCaseW(0, 9-1);
-    std::uniform_int_distribution<> distribNCaseH(0, 8-1);
+    std::uniform_int_distribution<> distribNCaseW(0, num_case_w-1);
+    std::uniform_int_distribution<> distribNCaseH(0, num_case_h-1);
     int i = distribNCaseW(generator);
     int j = distribNCaseH(generator);
-    std::uniform_int_distribution<> distribPosX(56*i,56*i+56);
-    std::uniform_int_distribution<> distribPosY(55*j,55*j+55);
+    std::uniform_int_distribution<> distribPosX(case_width*i,case_width*i+case_width);
+    std::uniform_int_distribution<> distribPosY(case_height*j,case_height*j+case_height);
     int px = distribPosX(generator);
     int py = distribPosY(generator);
     return std::pair<int, int>(px, py); 
@@ -39,7 +39,8 @@ void generate_germ(std::vector<std::pair<int,int>>& buffer, unsigned int width, 
 {
     int num_case_w, num_case_h, case_width, case_height;
     framing(width, height, num_case_w, num_case_h, case_width, case_height);
-    for(int i = 0; i < num_of_germ; ++i) buffer.push_back(rand_germ_position(num_case_w, num_case_h, case_width, case_width));
+    for(int i = 0; i < num_of_germ; ++i) 
+        buffer.push_back(rand_germ_position(num_case_w, num_case_h, case_width, case_width));
 }
 
 void color_germs(cv::Mat const& src, cv::Mat & dst, std::vector<std::pair<int, int>> const& germs) 
@@ -76,23 +77,6 @@ int main(int argc, char** argv)
 
     cv::imshow("Image", image);
     cv::imshow("Image with germs", imageWithGerms);
-
-    // int num_case_w, num_case_h, case_width, case_height;
-    // framing(512, 440, num_case_w, num_case_h, case_width, case_height);
-    
-    // while(1) {
-    //     std::mt19937 generator{ std::random_device{}() };
-    //     std::uniform_int_distribution<> distribNCaseW(0, 9-1);
-    //     std::uniform_int_distribution<> distribNCaseH(0, 8-1);
-    //     int i = distribNCaseW(generator);
-    //     int j = distribNCaseH(generator);
-    //     std::uniform_int_distribution<> distribPosX(56*i,56*i+56);
-    //     std::uniform_int_distribution<> distribPosY(55*j,55*j+55);
-    //     int px = distribPosX(generator);
-    //     int py = distribPosY(generator);
-    //     std::cout << i << ", " << j << ", " << px << ", " << py << '\n';
-    //     std::cin.get();
-    // }
 
     cv::waitKey(0); 
 
