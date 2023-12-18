@@ -83,20 +83,26 @@ bool growingPredicate(const cv::Vec3b& seedPixel, const cv::Vec3b& actualPixel, 
 }
 
 cv::Vec3b generateRandomColor() {
-    return cv::Vec3b(rand() % 256, rand() % 256, rand() % 256);
+    return cv::Vec3b((rand() % 156) + 100, (rand() % 156) + 100, (rand() % 156) + 100); // générer du noir
 }
 
 // Return the same color than the regionColor but darker
 cv::Vec3b getBorderColor(const cv::Vec3b & regionColor) {
-    return cv::Vec3b(regionColor[0] - 30, regionColor[1] - 30, regionColor[2] - 30);
+    return cv::Vec3b(regionColor[0], regionColor[1], regionColor[2] - 90); // Attention valeur négatif
 }
 
 void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint, int threshold) {
     std::queue<cv::Point> pixelQueue;
     pixelQueue.push(seedPoint);
 
+    int radius = 10;
+    cv::Scalar line_color(0,0,255);
+    int thickness = 1;
+    cv::circle(outputMask, seedPoint, radius, line_color, thickness);
+
     cv::Vec3b regionColor = generateRandomColor();
     cv::Vec3b borderColor = getBorderColor(regionColor);
+
     while (!pixelQueue.empty()) {
         cv::Point currentPixel = pixelQueue.front();
         pixelQueue.pop();
@@ -104,16 +110,19 @@ void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point see
         if (outputMask.at<cv::Vec3b>(currentPixel) == cv::Vec3b(0, 0, 0)) {
             for (int i = -1; i <= 1; ++i) {
                 for (int j = -1; j <= 1; ++j) {
-                    cv::Point neighbor(currentPixel.x + i, currentPixel.y + j);
+                    // currentPixel.x > 0 && currentPixel.x < tailleImage && pareil y
+                    cv::Point neighbor(currentPixel.x + i, currentPixel.y + j); 
 
                     if (neighbor.x >= 0 && neighbor.x < inputImage.cols &&
                         neighbor.y >= 0 && neighbor.y < inputImage.rows)
                     {
-                        if (growingPredicate(inputImage.at<cv::Vec3b>(currentPixel), inputImage.at<cv::Vec3b>(neighbor), threshold)) {
+                        if (growingPredicate(inputImage.at<cv::Vec3b>(seedPoint), inputImage.at<cv::Vec3b>(neighbor), threshold)) {
                             outputMask.at<cv::Vec3b>(currentPixel) = regionColor;
                             pixelQueue.push(neighbor);
                         } else {
-                            outputMask.at<cv::Vec3b>(currentPixel) = borderColor;
+                            outputMask.at<cv::Vec3b>(currentPixel) = borderColor; 
+                            // on calcule tout puis border 
+
                         }
                     }
                 }
@@ -154,17 +163,23 @@ int main(int argc, char** argv) {
     cv::imshow("Image with germs", imageWithGerms);
     
     // channel -> bleu, vert et rouge
-    //std::vector<cv::Mat> channels;
-    //cv::split(image, channels);
+    std::vector<cv::Mat> channels;
+    cv::split(image, channels);
+
+    cv::imshow("Niveau de bleu", channels[0]);
+    cv::imshow("Niveau de vert", channels[1]);
+    cv::imshow("Niveau de rouge", channels[2]);
 
     // CV_8UC3 permet les différent canaux de couleur contrairement à CV_8U
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
 
-    cv::Point testSeedPoint(germs[2].first, germs[2].second);
+    int threshold = 40;
 
-    int threshold = 10;
+    for (unsigned int i = 0; i < 10; ++i) {
+            cv::Point testSeedPoint(germs[i].second, germs[i].first);
+            regionGrowing(image, mask, testSeedPoint, threshold);
 
-    regionGrowing(image, mask, testSeedPoint, threshold);
+    }
 
     cv::imshow("Région Growing", mask);
 
