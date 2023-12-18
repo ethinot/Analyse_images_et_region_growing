@@ -43,7 +43,7 @@ void generate_germ(std::vector<std::pair<int,int>>& buffer, unsigned int width, 
 {
     int num_case_w, num_case_h, case_width, case_height;
     framing(width, height, num_case_w, num_case_h, case_width, case_height);
-    for(int i = 0; i < num_of_germ; ++i) 
+    for(unsigned int i = 0; i < num_of_germ; ++i) 
         buffer.push_back(rand_germ_position(num_case_w, num_case_h, case_width, case_height));
 }
 
