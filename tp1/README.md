@@ -27,3 +27,8 @@
 ## Fusion
 
 ## Multi-threading
+
+## Source 
+
+* [University of Nevada - region growing](https://www.cse.unr.edu/~bebis/CS791E/Notes/RegionGrowing.pdf)
+* [OpenLayers - Region growing](https://openlayers.org/en/latest/examples/region-growing.html)
