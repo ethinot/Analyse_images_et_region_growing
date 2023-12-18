@@ -1,10 +1,12 @@
 #include <iostream>
 #include <random>
-#include <cstdlib> // strtol 
+#include <cstdlib> // strtol, rand, srand ... 
 #include <fstream>
 #include <string>
 #include <vector>
 #include <utility> // pair
+#include<cmath>
+#include<queue>
 
 // opencv libs
 #include "opencv2/highgui.hpp"
@@ -59,8 +61,70 @@ void color_germs(cv::Mat const& src, cv::Mat & dst, std::vector<std::pair<int, i
     } 
 } 
 
-int main(int argc, char** argv)
-{
+/* CM Slide 47 
+ - Chaque pixel est décrit selon certains cannaux : R,G,B,H,S,V,…
+R, G, B : Rouge, Vert, Bleu
+
+H, S, V : Teinte (Hue), Saturation, Valeur (ou luminance)
+
+Précision : utilisation de la structure "Vec3b" pour prendre en compte les 3 cannaux d'une image de couleur,
+            respectivement bleu, vert et rouge.
+            La structure Vec3b contient des canaux, chaque canal est de type uchar (0 à 255).
+
+*/
+
+
+bool growingPredicate(const cv::Vec3b& seedPixel, const cv::Vec3b& actualPixel, int threshold) {
+    int diffBlue = std::abs(static_cast<int>(seedPixel[0]) - static_cast<int>(actualPixel[0]));
+    int diffGreen = std::abs(static_cast<int>(seedPixel[1]) - static_cast<int>(actualPixel[1]));
+    int diffRed = std::abs(static_cast<int>(seedPixel[2]) - static_cast<int>(actualPixel[2]));
+
+    return (diffBlue < threshold) && (diffGreen < threshold) && (diffRed < threshold);
+}
+
+cv::Vec3b generateRandomColor() {
+    return cv::Vec3b(rand() % 256, rand() % 256, rand() % 256);
+}
+
+// Return the same color than the regionColor but darker
+cv::Vec3b getBorderColor(const cv::Vec3b & regionColor) {
+    return cv::Vec3b(regionColor[0] - 30, regionColor[1] - 30, regionColor[2] - 30);
+}
+
+void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint, int threshold) {
+    std::queue<cv::Point> pixelQueue;
+    pixelQueue.push(seedPoint);
+
+    cv::Vec3b regionColor = generateRandomColor();
+    cv::Vec3b borderColor = getBorderColor(regionColor);
+    while (!pixelQueue.empty()) {
+        cv::Point currentPixel = pixelQueue.front();
+        pixelQueue.pop();
+
+        if (outputMask.at<cv::Vec3b>(currentPixel) == cv::Vec3b(0, 0, 0)) {
+            for (int i = -1; i <= 1; ++i) {
+                for (int j = -1; j <= 1; ++j) {
+                    cv::Point neighbor(currentPixel.x + i, currentPixel.y + j);
+
+                    if (neighbor.x >= 0 && neighbor.x < inputImage.cols &&
+                        neighbor.y >= 0 && neighbor.y < inputImage.rows)
+                    {
+                        if (growingPredicate(inputImage.at<cv::Vec3b>(currentPixel), inputImage.at<cv::Vec3b>(neighbor), threshold)) {
+                            outputMask.at<cv::Vec3b>(currentPixel) = regionColor;
+                            pixelQueue.push(neighbor);
+                        } else {
+                            outputMask.at<cv::Vec3b>(currentPixel) = borderColor;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    std::srand(static_cast<unsigned>(time(nullptr)));
+    
     if (argc < 2) { 
         printf("usage: DisplayImage.out <Image_Path> (<num of germs>)\n"); 
         return -1; 
@@ -86,8 +150,23 @@ int main(int argc, char** argv)
     cv::Mat imageWithGerms;
     color_germs(image, imageWithGerms, germs);
 
-    cv::imshow("Image", image);
+    //cv::imshow("Image", image);
     cv::imshow("Image with germs", imageWithGerms);
+    
+    // channel -> bleu, vert et rouge
+    //std::vector<cv::Mat> channels;
+    //cv::split(image, channels);
+
+    // CV_8UC3 permet les différent canaux de couleur contrairement à CV_8U
+    cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
+
+    cv::Point testSeedPoint(germs[2].first, germs[2].second);
+
+    int threshold = 10;
+
+    regionGrowing(image, mask, testSeedPoint, threshold);
+
+    cv::imshow("Région Growing", mask);
 
     cv::waitKey(0); 
 
