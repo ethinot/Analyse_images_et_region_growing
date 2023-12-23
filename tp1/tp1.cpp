@@ -22,6 +22,31 @@ void framing(unsigned int im_width, unsigned int im_height, int& num_case_w, int
     case_height = im_height / num_case_h;
 } 
 
+void draw_framing(cv::Mat & image, int thickness=2, cv::Scalar color=cv::Scalar(0, 0, 0)) 
+{
+    unsigned int rows = image.rows;
+    unsigned int cols = image.cols;
+
+    int num_cols, num_rows, case_width, case_height;
+    framing(cols, rows, num_cols, num_rows, case_width, case_height);
+
+    cv::Point start(0, 0);
+    cv::Point end(cols, 0);
+    for (unsigned int r = 0; r < num_rows; ++r) {
+        cv::line(image, start, end, color, thickness, cv::LINE_8);
+        start.y += case_height;
+        end.y += case_height;
+    }
+
+    start = cv::Point(0, 0);
+    end = cv::Point(0, rows);
+    for (unsigned int r = 0; r < num_cols; ++r) {
+        cv::line(image, start, end, color, thickness, cv::LINE_8);
+        start.x += case_width;
+        end.x += case_width;
+    }
+}
+
 std::pair<int, int> rand_germ_position(int num_case_w, int num_case_h, int case_width, int case_height)
 {
     // std::cout << "random sampling for i in [" << 0 << " " << num_case_w-1 << "]\n";
@@ -232,7 +257,12 @@ int main(int argc, char** argv) {
     segmentation(germs, image, mask80, 0.80);
 
     cv::Mat mask90 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask90, 0.90);
+    segmentation(germs, image, mask90, 0.85);
+
+    cv::Mat framing = image.clone();
+    draw_framing(framing, 2);
+
+    cv::imshow("Cadrillage", framing);
 
     std::vector<cv::Mat> hImages1 = { image, mask70 }; 
     std::vector<cv::Mat> hImages2 = { mask80, mask90 }; 
