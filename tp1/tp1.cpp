@@ -115,18 +115,18 @@ bool growing_predicate(int hash1, int hash2, double thresholdPercentage)
 }
 
 
-cv::Vec3b generateRandomColor() {
+cv::Vec3b generate_random_color() {
     std::mt19937 generator{ std::random_device{}() };
     std::uniform_int_distribution<> distrib(25, 255);
     return cv::Vec3b(distrib(generator), distrib(generator), distrib(generator)); // générer du noir
 }
 
 // Return the same color than the regionColor but darker
-cv::Vec3b getBorderColor(const cv::Vec3b & regionColor) {
-    return cv::Vec3b(regionColor[0], regionColor[1], regionColor[2] - 90); // Attention valeur négatif
-}
+// cv::Vec3b get_border_color(const cv::Vec3b & regionColor) {
+//     return cv::Vec3b(regionColor[0], regionColor[1], regionColor[2] - 90); // Attention valeur négatif
+// }
 
-void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint, double threshold, bool displayGerms=false) {
+void region_growing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint, double threshold, bool displayGerms=false) {
     std::queue<cv::Point> pixelQueue;
     pixelQueue.push(seedPoint);
     
@@ -137,8 +137,8 @@ void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point see
         cv::circle(outputMask, seedPoint, radius, line_color, thickness);
     }
 
-    cv::Vec3b regionColor = generateRandomColor();
-    cv::Vec3b borderColor = getBorderColor(regionColor);
+    cv::Vec3b regionColor = generate_random_color();
+    cv::Vec3b borderColor(255, 255, 255);
 
     cv::Vec3b seed_bgr = inputImage.at<cv::Vec3b>(seedPoint);
     uint32_t seed_hash = bgr_hash(seed_bgr[0], seed_bgr[1], seed_bgr[2]);
@@ -181,12 +181,12 @@ void segmentation(const std::vector<std::pair<int,int>>& germs, const cv::Mat& i
 		[&, inputImage](const std::pair<int, int>& germ)
 		{
             cv::Point testSeedPoint(germ.second, germ.first);
-            regionGrowing(inputImage, outputMask, testSeedPoint, threshold, displayGerms);
+            region_growing(inputImage, outputMask, testSeedPoint, threshold, displayGerms);
 		});
 #else 
     for (unsigned int i = 0; i < germs.size(); ++i) {
         cv::Point testSeedPoint(germs[i].second, germs[i].first);
-        regionGrowing(inputImage, outputMask, testSeedPoint, threshold, displayGerms);
+        region_growing(inputImage, outputMask, testSeedPoint, threshold, displayGerms);
     }
 #endif
 }
