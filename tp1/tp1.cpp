@@ -14,12 +14,13 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 
-void framing(unsigned int im_width, unsigned int im_height, int& num_case_w, int& num_case_h, int& case_width, int& case_height) 
+
+void framing(unsigned int imWidth, unsigned int imHeight, int& numCaseW, int& numCaseH, int& caseWidth, int& caseHeight) 
 {
-    num_case_w = (int)(std::log2f((float)im_width));
-    num_case_h = (int)(std::log2f((float)im_height));
-    case_width = im_width / num_case_w;
-    case_height = im_height / num_case_h;
+    numCaseW = (int)(std::log2f((float)imWidth));
+    numCaseH = (int)(std::log2f((float)imHeight));
+    caseWidth = imWidth / numCaseW;
+    caseHeight = imHeight / numCaseH;
 } 
 
 void draw_framing(cv::Mat & image, int thickness=2, cv::Scalar color=cv::Scalar(0, 0, 0)) 
@@ -27,52 +28,52 @@ void draw_framing(cv::Mat & image, int thickness=2, cv::Scalar color=cv::Scalar(
     unsigned int rows = image.rows;
     unsigned int cols = image.cols;
 
-    int num_cols, num_rows, case_width, case_height;
-    framing(cols, rows, num_cols, num_rows, case_width, case_height);
+    int numCols, numRows, caseWidth, caseHeight;
+    framing(cols, rows, numCols, numRows, caseWidth, caseHeight);
 
     cv::Point start(0, 0);
     cv::Point end(cols, 0);
-    for (unsigned int r = 0; r < num_rows; ++r) {
+    for (int r = 0; r < numRows; ++r) {
         cv::line(image, start, end, color, thickness, cv::LINE_8);
-        start.y += case_height;
-        end.y += case_height;
+        start.y += caseHeight;
+        end.y += caseHeight;
     }
 
     start = cv::Point(0, 0);
     end = cv::Point(0, rows);
-    for (unsigned int r = 0; r < num_cols; ++r) {
+    for (int r = 0; r < numCols; ++r) {
         cv::line(image, start, end, color, thickness, cv::LINE_8);
-        start.x += case_width;
-        end.x += case_width;
+        start.x += caseWidth;
+        end.x += caseWidth;
     }
 }
 
-std::pair<int, int> rand_germ_position(int num_case_w, int num_case_h, int case_width, int case_height)
+std::pair<int, int> rand_germ_position(int numCaseW, int numCaseH, int caseWidth, int caseHeight)
 {
-    // std::cout << "random sampling for i in [" << 0 << " " << num_case_w-1 << "]\n";
-    // std::cout << "random sampling for j in [" << 0 << " " << num_case_h-1 << "]\n";
+    // std::cout << "random sampling for i in [" << 0 << " " << numCaseW - 1 << "]\n";
+    // std::cout << "random sampling for j in [" << 0 << " " << numCaseH - 1 << "]\n";
     std::mt19937 generator{ std::random_device{}() };
-    std::uniform_int_distribution<> distribNCaseW(0, num_case_w-1);
-    std::uniform_int_distribution<> distribNCaseH(0, num_case_h-1);
+    std::uniform_int_distribution<> distribNCaseW(0, numCaseW - 1);
+    std::uniform_int_distribution<> distribNCaseH(0, numCaseH - 1);
     int i = distribNCaseW(generator);
     int j = distribNCaseH(generator);
-    // std::cout << "value of i: " << i << ", case width: " << case_width << "\n";
-    // std::cout << "value of j: " << j << ", case height: " << case_height << "\n";
-    // std::cout << "random sampling for px in [" << case_width*i << " " << case_width*i+case_width << "]\n";
-    // std::cout << "random sampling for py in [" << case_height*j << " " << case_height*j+case_height << "]\n";
-    std::uniform_int_distribution<> distribPosX(case_width*i,case_width*i+case_width);
-    std::uniform_int_distribution<> distribPosY(case_height*j,case_height*j+case_height);
+    // std::cout << "value of i: " << i << ", case width: " << caseWidth << "\n";
+    // std::cout << "value of j: " << j << ", case height: " << caseHeight << "\n";
+    // std::cout << "random sampling for px in [" << caseWidth * i << " " << caseWidth * i + case_width << "]\n";
+    // std::cout << "random sampling for py in [" << caseHeight * j << " " << caseHeight * j + caseHeight << "]\n";
+    std::uniform_int_distribution<> distribPosX(caseWidth * i, caseWidth * i + caseWidth);
+    std::uniform_int_distribution<> distribPosY(caseHeight * j, caseHeight * j + caseHeight);
     int px = distribPosX(generator);
     int py = distribPosY(generator);
     return std::pair<int, int>(py, px); // (row,col) 
 } 
 
-void generate_germ(std::vector<std::pair<int,int>>& buffer, unsigned int width, unsigned int height, unsigned int num_of_germ=10) 
+void generate_germ(std::vector<std::pair<int,int>>& buffer, unsigned int width, unsigned int height, unsigned int numOfGerm = 10) 
 {
-    int num_case_w, num_case_h, case_width, case_height;
-    framing(width, height, num_case_w, num_case_h, case_width, case_height);
-    for(unsigned int i = 0; i < num_of_germ; ++i) 
-        buffer.push_back(rand_germ_position(num_case_w, num_case_h, case_width, case_height));
+    int numCaseW, numCaseH, caseWidth, caseHeight;
+    framing(width, height, numCaseW, numCaseH, caseWidth, caseHeight);
+    for(unsigned int i = 0; i < numOfGerm; ++i) 
+        buffer.push_back(rand_germ_position(numCaseW, numCaseH, caseWidth, caseHeight));
 }
 
 void color_germs(cv::Mat const& src, cv::Mat & dst, std::vector<std::pair<int, int>> const& germs) 
@@ -107,32 +108,12 @@ double proximity_ratio(int a, int b)
     return 1.0;
 }
 
-// Check if the proximity ratio if above the threshold percentage 
-bool growing_predicate(int hash_1, int hash_2, double threshold_percentage)  
+// Check if the proximity ratio is above the threshold percentage 
+bool growing_predicate(int hash1, int hash2, double thresholdPercentage)  
 {
-    return proximity_ratio(hash_1, hash_2) >= threshold_percentage;
+    return proximity_ratio(hash1, hash2) >= thresholdPercentage;
 }
 
-/* CM Slide 47 
- - Chaque pixel est décrit selon certains cannaux : R,G,B,H,S,V,…
-R, G, B : Rouge, Vert, Bleu
-
-H, S, V : Teinte (Hue), Saturation, Valeur (ou luminance)
-
-Précision : utilisation de la structure "Vec3b" pour prendre en compte les 3 cannaux d'une image de couleur,
-            respectivement bleu, vert et rouge.
-            La structure Vec3b contient des canaux, chaque canal est de type uchar (0 à 255).
-
-*/
-
-
-bool growingPredicate(const cv::Vec3b& seedPixel, const cv::Vec3b& actualPixel, int threshold) {
-    int diffBlue = std::abs(static_cast<int>(seedPixel[0]) - static_cast<int>(actualPixel[0]));
-    int diffGreen = std::abs(static_cast<int>(seedPixel[1]) - static_cast<int>(actualPixel[1]));
-    int diffRed = std::abs(static_cast<int>(seedPixel[2]) - static_cast<int>(actualPixel[2]));
-
-    return (diffBlue < threshold) && (diffGreen < threshold) && (diffRed < threshold);
-}
 
 cv::Vec3b generateRandomColor() {
     std::mt19937 generator{ std::random_device{}() };
