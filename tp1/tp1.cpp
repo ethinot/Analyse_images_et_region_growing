@@ -4,91 +4,135 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <utility> // pair
 #include<cmath>
 #include<queue>
 #include <execution>
+#include <chrono>
+#include <variant>
+#include <iomanip>
+#include <unordered_map>
 
 // opencv libs
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 
-void framing(unsigned int im_width, unsigned int im_height, int& num_case_w, int& num_case_h, int& case_width, int& case_height) 
+float convolution(cv::Mat const& img, const cv::Mat& h, int x, int y)
 {
-    num_case_w = (int)(std::log2f((float)im_width));
-    num_case_h = (int)(std::log2f((float)im_height));
-    case_width = im_width / num_case_w;
-    case_height = im_height / num_case_h;
-} 
-
-void draw_framing(cv::Mat & image, int thickness=2, cv::Scalar color=cv::Scalar(0, 0, 0)) 
-{
-    unsigned int rows = image.rows;
-    unsigned int cols = image.cols;
-
-    int num_cols, num_rows, case_width, case_height;
-    framing(cols, rows, num_cols, num_rows, case_width, case_height);
-
-    cv::Point start(0, 0);
-    cv::Point end(cols, 0);
-    for (unsigned int r = 0; r < num_rows; ++r) {
-        cv::line(image, start, end, color, thickness, cv::LINE_8);
-        start.y += case_height;
-        end.y += case_height;
+    float sum = 0.0;
+    for (int u = -1; u <= 1; ++u) {
+        for (int v = -1; v <= 1; ++v) {
+            sum += h.at<float>(1 + u, 1 + v) * img.at<uchar>(y + u, x + v);
+        }
     }
+    return sum;
+}
 
-    start = cv::Point(0, 0);
-    end = cv::Point(0, rows);
-    for (unsigned int r = 0; r < num_cols; ++r) {
-        cv::line(image, start, end, color, thickness, cv::LINE_8);
-        start.x += case_width;
-        end.x += case_width;
+// Fonction qui applique une matrice de filtrage sur une image via l'utilisation du produit de convolution
+void filtering(const cv::Mat& src, cv::Mat& dst, const cv::Mat& h)
+{
+    assert(h.rows == 3 && h.cols == 3);
+    int height = src.rows;
+    int width = src.cols;
+    dst = cv::Mat::zeros(src.size(), src.type());
+
+    for (int r = 1; r < height - 1; ++r) {
+        for (int c = 1; c < width - 1; ++c) {
+            dst.at<uchar>(r, c) = cv::saturate_cast<uchar>(convolution(src, h, c, r));
+        }
     }
 }
 
-std::pair<int, int> rand_germ_position(int num_case_w, int num_case_h, int case_width, int case_height)
+void edge_detection(cv::Mat const& src, cv::Mat & dst, unsigned int ch=0)
 {
-    // std::cout << "random sampling for i in [" << 0 << " " << num_case_w-1 << "]\n";
-    // std::cout << "random sampling for j in [" << 0 << " " << num_case_h-1 << "]\n";
+    std::vector<cv::Mat> chls;
+    cv::split(src, chls);
+    dst = src.clone();
+    float edf[9] =
+                { -1, -1, -1,
+                -1,  8, -1,
+                -1, -1, -1};
+
+    cv::Mat h(3, 3, CV_32F, edf);
+
+    filtering(chls[ch], dst, h);
+}
+
+void framing(unsigned int imW, unsigned int imH, int& numC, int& numR, int& caseW, int& caseH)
+{
+    numC = (int)(std::log2f((float)imW));
+    numR = (int)(std::log2f((float)imH));
+    caseW = imW / numC;
+    caseH = imH / numR;
+}
+
+// void draw_framing(cv::Mat & image, int thickness=2, cv::Scalar color=cv::Scalar(0, 0, 0))
+// {
+//     unsigned int rows = image.rows;
+//     unsigned int cols = image.cols;
+
+//     int num_cols, num_rows, caseW, caseH;
+//     framing(cols, rows, num_cols, num_rows, caseW, caseH);
+
+//     cv::Point start(0, 0);
+//     cv::Point end(cols, 0);
+//     for (unsigned int r = 0; r < num_rows; ++r) {
+//         cv::line(image, start, end, color, thickness, cv::LINE_8);
+//         start.y += caseH;
+//         end.y += caseH;
+//     }
+
+//     start = cv::Point(0, 0);
+//     end = cv::Point(0, rows);
+//     for (unsigned int r = 0; r < num_cols; ++r) {
+//         cv::line(image, start, end, color, thickness, cv::LINE_8);
+//         start.x += caseW;
+//         end.x += caseW;
+//     }
+// }
+
+cv::Point rand_seed_position(int numC, int numR, int caseW, int caseH)
+{
     std::mt19937 generator{ std::random_device{}() };
-    std::uniform_int_distribution<> distribNCaseW(0, num_case_w-1);
-    std::uniform_int_distribution<> distribNCaseH(0, num_case_h-1);
+    std::uniform_int_distribution<> distribNCaseW(0, numC-1);
+    std::uniform_int_distribution<> distribNCaseH(0, numR-1);
     int i = distribNCaseW(generator);
     int j = distribNCaseH(generator);
-    // std::cout << "value of i: " << i << ", case width: " << case_width << "\n";
-    // std::cout << "value of j: " << j << ", case height: " << case_height << "\n";
-    // std::cout << "random sampling for px in [" << case_width*i << " " << case_width*i+case_width << "]\n";
-    // std::cout << "random sampling for py in [" << case_height*j << " " << case_height*j+case_height << "]\n";
-    std::uniform_int_distribution<> distribPosX(case_width*i,case_width*i+case_width);
-    std::uniform_int_distribution<> distribPosY(case_height*j,case_height*j+case_height);
+    std::uniform_int_distribution<> distribPosX(caseW*i,caseW*i+caseW);
+    std::uniform_int_distribution<> distribPosY(caseH*j,caseH*j+caseH);
     int px = distribPosX(generator);
     int py = distribPosY(generator);
-    return std::pair<int, int>(py, px); // (row,col) 
-} 
-
-void generate_germ(std::vector<std::pair<int,int>>& buffer, unsigned int width, unsigned int height, unsigned int num_of_germ=10) 
-{
-    int num_case_w, num_case_h, case_width, case_height;
-    framing(width, height, num_case_w, num_case_h, case_width, case_height);
-    for(unsigned int i = 0; i < num_of_germ; ++i) 
-        buffer.push_back(rand_germ_position(num_case_w, num_case_h, case_width, case_height));
+    return cv::Point(px,py); // (col,row)
 }
 
-void color_germs(cv::Mat const& src, cv::Mat & dst, std::vector<std::pair<int, int>> const& germs) 
+void generate_seed(cv::Mat const& img, std::vector<cv::Point>& seeds, unsigned int w, unsigned int h, unsigned int numSeeds=10)
+{
+    int numC, numR, caseW, caseH;
+    framing(w, h, numC, numR, caseW, caseH);
+    float dist = 25;
+    for(unsigned int i = 0; i < numSeeds; ++i) {
+        cv::Point seed;
+        do {
+            seed = rand_seed_position(numC, numR, caseW, caseH);
+        } while(img.at<cv::Vec3b>(seed) == cv::Vec3b(255));
+        seeds.push_back(seed);
+    }
+}
+
+void display_seeds(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> const& seeds)
 {
     dst = src.clone();
-    for(auto& germ : germs) {
-        cv::Point center(germ.second, germ.first); // (col,row)
+    for(auto& seed : seeds) {
+        cv::Point center(seed); // (col,row)
         int radius = 10;
         cv::Scalar line_color(0,0,255);
         int thickness = 1;
         cv::circle(dst, center, radius, line_color, thickness);
-    } 
-} 
+    }
+}
 
-// Calculate a "unique" hash for a given BGR value 
-int bgr_hash(uchar B, uchar G, uchar R) 
+// Calculate a "unique" hash for a given BGR value
+int bgr_hash(uchar B, uchar G, uchar R)
 {
     int hash = 0;
     hash += B*1+G*10+R*100;
@@ -98,69 +142,61 @@ int bgr_hash(uchar B, uchar G, uchar R)
     return hash;
 }
 
-// Return the ratio between a and b. This will be use 
+// Return the ratio between a and b. This will be use
 // for checking the proximity of two hash value.
-double proximity_ratio(int a, int b) 
+double proximity_ratio(int a, int b)
 {
     if (a<b) return double(a)/double(b);
     if (a>b) return double(b)/double(a);
     return 1.0;
 }
 
-// Check if the proximity ratio if above the threshold percentage 
-bool growing_predicate(int hash_1, int hash_2, double threshold_percentage)  
+// Check if the proximity ratio if above the threshold percentage (based on color value)
+bool color_predicate(int hash_1, int hash_2, double threshold)
 {
-    return proximity_ratio(hash_1, hash_2) >= threshold_percentage;
+    return proximity_ratio(hash_1, hash_2) >= threshold;
 }
 
-/* CM Slide 47 
- - Chaque pixel est décrit selon certains cannaux : R,G,B,H,S,V,…
-R, G, B : Rouge, Vert, Bleu
-
-H, S, V : Teinte (Hue), Saturation, Valeur (ou luminance)
-
-Précision : utilisation de la structure "Vec3b" pour prendre en compte les 3 cannaux d'une image de couleur,
-            respectivement bleu, vert et rouge.
-            La structure Vec3b contient des canaux, chaque canal est de type uchar (0 à 255).
-
-*/
-
-
-bool growingPredicate(const cv::Vec3b& seedPixel, const cv::Vec3b& actualPixel, int threshold) {
-    int diffBlue = std::abs(static_cast<int>(seedPixel[0]) - static_cast<int>(actualPixel[0]));
-    int diffGreen = std::abs(static_cast<int>(seedPixel[1]) - static_cast<int>(actualPixel[1]));
-    int diffRed = std::abs(static_cast<int>(seedPixel[2]) - static_cast<int>(actualPixel[2]));
-
-    return (diffBlue < threshold) && (diffGreen < threshold) && (diffRed < threshold);
+// Predicate based on intensity values
+bool intensity_predicate(uchar seedIntensity, uchar currentIntensity, uchar threshold) {
+    return abs(currentIntensity - seedIntensity) <= threshold;
 }
 
-cv::Vec3b generateRandomColor() {
+cv::Vec3b generate_random_color() {
     std::mt19937 generator{ std::random_device{}() };
     std::uniform_int_distribution<> distrib(25, 255);
-    return cv::Vec3b(distrib(generator), distrib(generator), distrib(generator)); // générer du noir
+    return {(uchar)distrib(generator), (uchar)distrib(generator), (uchar)distrib(generator)}; // générer du noir
 }
 
 // Return the same color than the regionColor but darker
-cv::Vec3b getBorderColor(const cv::Vec3b & regionColor) {
-    return cv::Vec3b(regionColor[0], regionColor[1], regionColor[2] - 90); // Attention valeur négatif
+cv::Vec3b get_border_color(const cv::Vec3b & regionColor) {
+    return {regionColor[0], regionColor[1], (uchar)(regionColor[2] - 90)}; // Attention valeur négatif
 }
 
-void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint, double threshold, bool displayGerms=false) {
+void region_growing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint,
+    std::variant<uchar, double> threshold, bool intensityBased=true, bool displaySeeds=false) { // based on color distance
+
     std::queue<cv::Point> pixelQueue;
     pixelQueue.push(seedPoint);
-    
-    if (displayGerms) {
+
+    if (displaySeeds) {
         int radius = 10;
         cv::Scalar line_color(0,0,255);
         int thickness = 1;
         cv::circle(outputMask, seedPoint, radius, line_color, thickness);
     }
 
-    cv::Vec3b regionColor = generateRandomColor();
-    cv::Vec3b borderColor = getBorderColor(regionColor);
+    cv::Vec3b regionColor = generate_random_color();
+    cv::Vec3b borderColor = get_border_color(regionColor);
 
-    cv::Vec3b seed_bgr = inputImage.at<cv::Vec3b>(seedPoint);
-    uint32_t seed_hash = bgr_hash(seed_bgr[0], seed_bgr[1], seed_bgr[2]);
+    uint32_t seedHash;
+    if (!intensityBased) {
+        cv::Vec3b seed = inputImage.at<cv::Vec3b>(seedPoint);
+        seedHash = bgr_hash(seed[0], seed[1], seed[2]);
+    }
+
+    cv::Mat grayImage;
+    cv::cvtColor(inputImage, grayImage, cv::COLOR_BGR2GRAY);
 
     while (!pixelQueue.empty()) {
         cv::Point currentPixel = pixelQueue.front();
@@ -170,19 +206,29 @@ void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point see
             for (int i = -1; i <= 1; ++i) {
                 for (int j = -1; j <= 1; ++j) {
                     if (i != 0 || j != 0) { // not current pixel coords
-                        cv::Point neighbor(currentPixel.x + i, currentPixel.y + j); 
+                        cv::Point neighbor(currentPixel.x + i, currentPixel.y + j);
 
                         if (neighbor.x >= 0 && neighbor.x < inputImage.cols &&
                             neighbor.y >= 0 && neighbor.y < inputImage.rows)
                         {
-                            cv::Vec3b neighbor_bgr = inputImage.at<cv::Vec3b>(neighbor);
-                            uint32_t neighbor_hash = bgr_hash(neighbor_bgr[0], neighbor_bgr[1], neighbor_bgr[2]);
-                            if (growing_predicate(seed_hash, neighbor_hash, threshold)) {
+                            bool valid_predicat = false;
+                            if (intensityBased) {
+                                uchar neighborTmp = grayImage.at<uchar>(neighbor); // intensity based
+                                uchar seedTmp = grayImage.at<uchar>(seedPoint);
+                                uchar threshTmp = std::get<uchar>(threshold);
+                                valid_predicat = intensity_predicate(seedTmp, neighborTmp, threshTmp);
+                            } else {
+                                cv::Vec3b neighborTmp = inputImage.at<cv::Vec3b>(neighbor); // color based
+                                uint32_t neighborHash = bgr_hash(neighborTmp[0], neighborTmp[1], neighborTmp[2]);
+                                double threshTmp = std::get<double>(threshold);
+                                valid_predicat = color_predicate(seedHash, neighborHash, threshTmp);
+                            }
+                            if (valid_predicat) {
                                 outputMask.at<cv::Vec3b>(currentPixel) = regionColor;
                                 pixelQueue.push(neighbor);
                             } else {
-                                outputMask.at<cv::Vec3b>(currentPixel) = borderColor; 
-                                // on calcule tout puis border 
+                                outputMask.at<cv::Vec3b>(currentPixel) = borderColor;
+                                // on calcule tout puis border
                             }
                         }
                     }
@@ -192,105 +238,212 @@ void regionGrowing(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point see
     }
 }
 
-void segmentation(const std::vector<std::pair<int,int>>& germs, const cv::Mat& inputImage, cv::Mat& outputMask, double threshold, bool displayGerms=false) 
+void segmentation(const cv::Mat& src, cv::Mat& dst, const std::vector<cv::Point>& seeds,
+    std::variant<uchar, double> threshold, bool mode=true, bool displaySeeds=false)
 {
 #define MT 0
 #if MT
-	std::for_each(std::execution::par, germs.begin(), germs.end(), 
-		[&, inputImage](const std::pair<int, int>& germ)
+	std::for_each(std::execution::par, seeds.begin(), seeds.end(),
+		[&, inputImage](const cv::Point>& seed)
 		{
-            cv::Point testSeedPoint(germ.second, germ.first);
-            regionGrowing(inputImage, outputMask, testSeedPoint, threshold, displayGerms);
+            cv::Point testSeedPoint(seed);
+            region_growing(src, dst, testSeedPoint, threshold, mode, displaySeeds);
 		});
-#else 
-    for (unsigned int i = 0; i < germs.size(); ++i) {
-        cv::Point testSeedPoint(germs[i].second, germs[i].first);
-        regionGrowing(inputImage, outputMask, testSeedPoint, threshold, displayGerms);
+#else
+    for (unsigned int i = 0; i < seeds.size(); ++i) {
+        cv::Point testSeedPoint(seeds[i]);
+        region_growing(src, dst, testSeedPoint, threshold, mode, displaySeeds);
     }
 #endif
 }
 
-int main(int argc, char** argv) {
-    if (argc < 2) { 
-        printf("usage: DisplayImage.out <Image_Path> (<num of germs>)\n"); 
-        return -1; 
-    } 
+std::string bgr_to_hex(cv::Vec3b const& bgr)
+{
+    std::stringstream stream;
+    stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(bgr[2]) // Red
+           << std::setw(2) << std::setfill('0') << static_cast<int>(bgr[1]) // Green
+           << std::setw(2) << std::setfill('0') << static_cast<int>(bgr[0]); // Blue
+    return stream.str();
+}
 
-    cv::Mat image; 
-    image = cv::imread(argv[1], cv::IMREAD_COLOR); 
-
-    if (!image.data) { 
-        printf("No image data \n"); 
-        return -1; 
-    } 
-
-    std::vector<std::pair<int,int>> germs;
-    int num = 10;
-    if (argc == 3) { 
-        num = strtol(argv[2], nullptr, 10);
-        generate_germ(germs, image.cols, image.rows, num);
-    } else {
-        generate_germ(germs, image.cols, image.rows);
+cv::Vec3b hex_to_bgr(const std::string& hexColor) {
+    // Remove '#' if present
+    std::string hexValue = hexColor;
+    if (hexColor[0] == '#') {
+        hexValue = hexColor.substr(1);
     }
-    for(auto& germ: germs) std::cout << "[rows:" << germ.first << ", cols:" << germ.second << "]\n";
 
-    cv::Mat imageWithGerms;
-    color_germs(image, imageWithGerms, germs);
+    // Parse hexadecimal components
+    unsigned int hexInt;
+    std::istringstream(hexValue) >> std::hex >> hexInt;
 
-    //cv::imshow("Image", image);
-    // cv::imshow("Image with germs", imageWithGerms);
-    
-    // channel -> bleu, vert et rouge
-    // std::vector<cv::Mat> channels;
-    // cv::split(image, channels);
+    // Extract Red, Green, and Blue components
+    uchar blue = hexInt & 0xFF;
+    uchar green = (hexInt >> 8) & 0xFF;
+    uchar red = (hexInt >> 16) & 0xFF;
 
-    // cv::imshow("Niveau de bleu", channels[0]);
-    // cv::imshow("Niveau de vert", channels[1]);
-    // cv::imshow("Niveau de rouge", channels[2]);
+    return cv::Vec3b(blue, green, red);
+}
 
-    // CV_8UC3 permet les différent canaux de couleur contrairement à CV_8U
+using region_type = std::pair<std::vector<cv::Point>, double>;
+using region_container = std::unordered_map<std::string, region_type>;
 
+// merge r1 into r2
+void sub_merge(region_type const& r1, region_type & r2, size_t const& s1, size_t const& s2)
+{
+    for (auto& pxl : r1.first) {
+        r2.first.push_back(pxl);
+    }
+    r2.second = ((double)s1 * r1.second + (double)s2 * r2.second) / (double)(s1 + s2);
+}
+
+// merge two regions
+void merge(region_container & regions, std::string const& hexR1, std::string const& hexR2)
+{
+    region_type region1 = regions[hexR1];
+    region_type region2 = regions[hexR2];
+
+    size_t sizeR1 = region1.first.size();
+    size_t sizeR2 = region2.first.size();
+    if (sizeR1 < sizeR2) {
+        sub_merge(region1, region2, sizeR1, sizeR2);
+        regions.erase(hexR1);
+        regions[hexR2] = region2;
+    } else {
+        sub_merge(region2, region1, sizeR1, sizeR2);
+        regions.erase(hexR2);
+        regions[hexR1] = region1;
+    }
+}
+
+void fill_region(cv::Mat & mask, region_container & regions) 
+{
+    for (auto& [key, value] : regions) {
+        cv::Vec3b color = hex_to_bgr(key);
+        for (auto& coords : value.first) {
+            mask.at<cv::Vec3b>(coords) = color;
+        }
+    }
+} 
+
+// void region_growing2(const cv::Mat& inputImage, cv::Mat& outputMask, cv::Point seedPoint,
+//     std::variant<uchar, double> threshold, bool intensityBased) { // based on color distance
+
+//     std::queue<cv::Point> pixelQueue;
+//     pixelQueue.push(seedPoint);
+
+//     cv::Vec3b regionColor = generate_random_color();
+//     std::string hexValue = bgr_to_hex(regionColor); 
+
+//     uint32_t seedHash;
+//     if (!intensityBased) {
+//         cv::Vec3b seed = inputImage.at<cv::Vec3b>(seedPoint);
+//         seedHash = bgr_hash(seed[0], seed[1], seed[2]);
+//     }
+
+//     cv::Mat grayImage;
+//     cv::cvtColor(inputImage, grayImage, cv::COLOR_BGR2GRAY);
+
+//     while (!pixelQueue.empty()) {
+//         cv::Point currentPixel = pixelQueue.front();
+//         pixelQueue.pop();
+
+//         if (outputMask.at<cv::Vec3b>(currentPixel) == cv::Vec3b(0, 0, 0)) {
+//             for (int i = -1; i <= 1; ++i) {
+//                 for (int j = -1; j <= 1; ++j) {
+//                     if (i != 0 || j != 0) { // not current pixel coords
+//                         cv::Point neighbor(currentPixel.x + i, currentPixel.y + j);
+
+//                         if (neighbor.x >= 0 && neighbor.x < inputImage.cols &&
+//                             neighbor.y >= 0 && neighbor.y < inputImage.rows)
+//                         {
+//                             bool valid_predicat = false;
+//                             if (intensityBased) {
+//                                 uchar neighborTmp = grayImage.at<uchar>(neighbor); // intensity based
+//                                 uchar seedTmp = grayImage.at<uchar>(seedPoint);
+//                                 uchar threshTmp = std::get<uchar>(threshold);
+//                                 valid_predicat = intensity_predicate(seedTmp, neighborTmp, threshTmp);
+//                             } else {
+//                                 cv::Vec3b neighborTmp = inputImage.at<cv::Vec3b>(neighbor); // color based
+//                                 uint32_t neighborHash = bgr_hash(neighborTmp[0], neighborTmp[1], neighborTmp[2]);
+//                                 double threshTmp = std::get<double>(threshold);
+//                                 valid_predicat = color_predicate(seedHash, neighborHash, threshTmp);
+//                             }
+//                             if (valid_predicat) {
+//                                 outputMask.at<cv::Vec3b>(currentPixel) = regionColor;
+//                                 pixelQueue.push(neighbor);
+//                             } else {
+//                                 outputMask.at<cv::Vec3b>(currentPixel) = borderColor;
+//                                 // on calcule tout puis border
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        printf("usage: DisplayImage.out <Image_Path> (<num of seeds>)\n");
+        return -1;
+    }
+
+    cv::Mat image;
+    image = cv::imread(argv[1], cv::IMREAD_COLOR);
+
+    if (!image.data) {
+        printf("No image data \n");
+        return -1;
+    }
+
+    std::vector<cv::Point> seeds;
+    int num = 10;
+    if (argc == 3) {
+        num = strtol(argv[2], nullptr, 10);
+        auto start = std::chrono::high_resolution_clock::now();
+        generate_seed(image, seeds, image.cols, image.rows, num);
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        std::cout << (duration.count() / 1000.0) << "ms" << std::endl;
+
+    } else {
+        generate_seed(image, seeds, image.cols, image.rows);
+    }
+
+    cv::Mat imageWithseeds;
+    display_seeds(image, imageWithseeds, seeds);
+
+    double dThreshold = 0.60;
     cv::Mat mask70 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask70, 0.70);
+    segmentation(image, mask70, seeds, dThreshold, false);
 
+    uchar ucThreshold = 30;
     cv::Mat mask80 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask80, 0.80);
+    segmentation(image, mask80, seeds, ucThreshold);
 
+    dThreshold = 0.90;
     cv::Mat mask90 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask90, 0.85);
+    segmentation(image, mask90, seeds, 0.90, false);
 
-    cv::Mat framing = image.clone();
-    draw_framing(framing, 2);
+    cv::Mat displayedseeds;
+    display_seeds(image, displayedseeds, seeds);
 
-    cv::imshow("Cadrillage", framing);
-
-    std::vector<cv::Mat> hImages1 = { image, mask70 }; 
-    std::vector<cv::Mat> hImages2 = { mask80, mask90 }; 
+    std::vector<cv::Mat> hImages1 = { displayedseeds, mask70 };
+    std::vector<cv::Mat> hImages2 = { mask80, mask90 };
 
     cv::Mat row1;
     cv::hconcat(hImages1, row1);
     cv::Mat row2;
     cv::hconcat(hImages2, row2);
 
-    std::vector<cv::Mat> vImages = { row1, row2 }; 
+    std::vector<cv::Mat> vImages = { row1, row2 };
 
     cv::Mat finalOutput;
     cv::vconcat(vImages, finalOutput);
 
     cv::imshow("Segmentation avec différents seuil (70%, 80%, 90%)", finalOutput);
-    // cv::imshow("Région Growing (threshold: 70%)", mask70);
-    // cv::imshow("Région Growing (threshold: 80%)", mask80);
-    // cv::imshow("Région Growing (threshold: 90%)", mask90);
-
-    // int a = bgr_hash(241, 156, 234);
-    // int b = bgr_hash(230, 160, 225);
-    // double threshold = 0.97;
-    // std::cout << "Hash for a=[241, 156, 234]: " << a << std::endl;
-    // std::cout << "Hash for b=[230, 160, 225]: " << b << std::endl;
-    // std::cout << "Proximity ratio between a & b: " << proximity_ratio(a,b)*100 << "%\n";
-    // std::cout << "With a threshold percentage of value: " << threshold 
-    //         << ", should a and b be on the same zone ? " 
-    //         << (growing_predicate(a, b, threshold) ? "Definitly, yes!\n" : "Absolutly not!\n"); 
 
     cv::waitKey(0); 
 
