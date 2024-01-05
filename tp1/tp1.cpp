@@ -218,60 +218,10 @@ int main(int argc, char** argv) {
     cv::Mat imageWithGerms;
     color_germs(image, imageWithGerms, germs);
 
-    //cv::imshow("Image", image);
-    // cv::imshow("Image with germs", imageWithGerms);
-    
-    // channel -> bleu, vert et rouge
-    // std::vector<cv::Mat> channels;
-    // cv::split(image, channels);
-
-    // cv::imshow("Niveau de bleu", channels[0]);
-    // cv::imshow("Niveau de vert", channels[1]);
-    // cv::imshow("Niveau de rouge", channels[2]);
-
-    // CV_8UC3 permet les différent canaux de couleur contrairement à CV_8U
-
-    cv::Mat mask70 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask70, 0.70);
-
-    cv::Mat mask80 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask80, 0.80);
-
-    cv::Mat mask90 = cv::Mat::zeros(image.size(), CV_8UC3);
-    segmentation(germs, image, mask90, 0.85);
-
     cv::Mat framing = image.clone();
     draw_framing(framing, 2);
 
     cv::imshow("Cadrillage", framing);
-
-    std::vector<cv::Mat> hImages1 = { image, mask70 }; 
-    std::vector<cv::Mat> hImages2 = { mask80, mask90 }; 
-
-    cv::Mat row1;
-    cv::hconcat(hImages1, row1);
-    cv::Mat row2;
-    cv::hconcat(hImages2, row2);
-
-    std::vector<cv::Mat> vImages = { row1, row2 }; 
-
-    cv::Mat finalOutput;
-    cv::vconcat(vImages, finalOutput);
-
-    cv::imshow("Segmentation avec différents seuil (70%, 80%, 90%)", finalOutput);
-    // cv::imshow("Région Growing (threshold: 70%)", mask70);
-    // cv::imshow("Région Growing (threshold: 80%)", mask80);
-    // cv::imshow("Région Growing (threshold: 90%)", mask90);
-
-    // int a = bgr_hash(241, 156, 234);
-    // int b = bgr_hash(230, 160, 225);
-    // double threshold = 0.97;
-    // std::cout << "Hash for a=[241, 156, 234]: " << a << std::endl;
-    // std::cout << "Hash for b=[230, 160, 225]: " << b << std::endl;
-    // std::cout << "Proximity ratio between a & b: " << proximity_ratio(a,b)*100 << "%\n";
-    // std::cout << "With a threshold percentage of value: " << threshold 
-    //         << ", should a and b be on the same zone ? " 
-    //         << (growing_predicate(a, b, threshold) ? "Definitly, yes!\n" : "Absolutly not!\n"); 
 
     cv::waitKey(0); 
 
