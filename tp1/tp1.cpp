@@ -210,7 +210,7 @@ void gnuPlot(const cv::Mat& hist, const std::string& fileName, const int histSiz
     }
 }
 
-std::vector<int> extractTopNHistogramValues(const cv::Mat& image, const cv::Rect& roi, int n) {
+std::vector<int> extract_histogram_max_alues(const cv::Mat& image, const cv::Rect& roi, int n) {
     cv::Mat roiImage = image(roi); // region of interest
 
     cv::Mat histogram;
