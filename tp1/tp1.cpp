@@ -31,11 +31,11 @@ cv::Point rand_seed_position(int numC, int numR, int caseW, int caseH)
     std::uniform_int_distribution<> distribNCaseH(0, numR-1);
     int i = distribNCaseW(generator);
     int j = distribNCaseH(generator);
-    std::uniform_int_distribution<> distribPosX(caseW*i,caseW*i+caseW);
-    std::uniform_int_distribution<> distribPosY(caseH*j,caseH*j+caseH);
+    std::uniform_int_distribution<> distribPosX(caseW*i,caseW*i+caseW-1);
+    std::uniform_int_distribution<> distribPosY(caseH*j,caseH*j+caseH-1);
     int px = distribPosX(generator);
     int py = distribPosY(generator);
-    return cv::Point(px,py); // (col,row)
+    return {px,py}; // (col,row)
 }
 
 void generate_seed(std::vector<cv::Point>& seeds, uint32_t w, uint32_t h, uint32_t numSeeds=10)
@@ -69,19 +69,40 @@ int bgr_to_hex(cv::Vec3b const& bgr)
     return (bgr[2] << 16) | (bgr[1] << 8) | bgr[0];
 }
 
+cv::Vec3b hex_to_bgr(int hexValue) {
+    uchar blue = hexValue & 0xFF;
+    uchar green = (hexValue >> 8) & 0xFF;
+    uchar red = (hexValue >> 16) & 0xFF;
+
+    return {blue, green, red};
+}
+
 // O(1)
 std::pair<cv::Scalar, cv::Scalar> interval_bounds(cv::Scalar const& hsv)
 {
+    double th;
     if (hsv[2] <= 30) { // Black
-        return std::make_pair(cv::Scalar(0, 0, 0), cv::Scalar(180, 255, 40));
+        th = 20;
+        double lowerv = ((hsv[2] - th) < 0) ? 0 : hsv[2] - th;
+        double upperv = hsv[2] + th;
+        return std::make_pair(cv::Scalar(0, 0, lowerv), cv::Scalar(180, 255, upperv));
     } else if (hsv[1] <= 70) {
         if (hsv[2] <= 175) { // Gray
-            return std::make_pair(cv::Scalar(0, 0, hsv[2]-40), cv::Scalar(180, 45, hsv[2]+40));
+            th = 40;
+            double lowerv = hsv[2] - th;
+            double upperv = hsv[2] + th;
+            return std::make_pair(cv::Scalar(0, 0, lowerv), cv::Scalar(180, 45, upperv));
         } else { // White
-            return std::make_pair(cv::Scalar(0, 0, 180), cv::Scalar(180, 70, 255));
+            th = 30;
+            double lowerv = hsv[2] - th;
+            double upperv = ((hsv[2] + th) > 255) ? 255 : hsv[2] + th;
+            return std::make_pair(cv::Scalar(0, 0, lowerv), cv::Scalar(180, 70, upperv));
         }
     }
-    return std::make_pair(cv::Scalar(hsv[0]-10, 70, 50), cv::Scalar(hsv[0]+10, 255, 255));
+    th = 10;
+    double lowerh = (hsv[0] - th < 0) ? 0 : hsv[0] - th;
+    double upperh = (hsv[0] + th > 180) ? 180 : hsv[0] + th;
+    return std::make_pair(cv::Scalar(lowerh, 70, 50), cv::Scalar(upperh, 255, 255));
 }
 
 // O(1)
@@ -125,6 +146,13 @@ cv::Scalar max(cv::Scalar const& sa, cv::Scalar const& sb)
     return ret;
 }
 
+void update_buffer(cv::Mat & buffer, std::list<cv::Point> const& points, int newValue)
+{
+    for (auto const& point : points) {
+        buffer.at<int>(point) = newValue;
+    }
+}
+
 // O(1)
 void merge(region_container & regions, int hexR1, int hexR2)
 {
@@ -141,7 +169,7 @@ void merge(region_container & regions, int hexR1, int hexR2)
     regions[hexR1].first.splice(
             regions[hexR1].first.end(), regions[hexR2].first);
 
-    regions.erase(hexR2);
+    regions.erase(regions.find(hexR2));
 }
 
 // O(1)
@@ -177,6 +205,7 @@ void process(region_container & regions, std::vector<cv::Mat> const& hsvChannels
                                 regions[hexKey].second[2];
                         if (predicate(lowerb, upperb, hsvNeighborRegion[2]) &&
                             predicate(hsvNeighborRegion[0], hsvNeighborRegion[1], currentRegionHsvMean)) {
+                            update_buffer(buffer, regions[hexNeighbor].first, hexKey);
                             merge(regions, hexKey, hexNeighbor);
                         }
                     }
@@ -199,17 +228,111 @@ void growing(region_container & regions, std::vector<cv::Mat> const& hsvChannels
 
     cv::Scalar hsvSeed(seedH, seedS, seedV);
     std::pair<cv::Scalar, cv::Scalar> bounds = interval_bounds(hsvSeed);
-    regions[hexKey].second.push_back(bounds.first);
-    regions[hexKey].second.push_back(bounds.second);
+    regions[hexKey].second.emplace_back(bounds.first);
+    regions[hexKey].second.emplace_back(bounds.second);
     regions[hexKey].second.emplace_back(0);
     update_mean(regions[hexKey], hsvSeed);
 
     regions[hexKey].first.push_back(seed);
+    buffer.at<int>(seed) = hexKey;
 
     while (!queue.empty()) {
         cv::Point current = queue.front();
         queue.pop();
         process(regions, hsvChannels, buffer, queue, current, hexKey);
+    }
+}
+
+std::vector<cv::Vec3b> generate_random_unique_BGR(size_t size) {
+    std::uniform_int_distribution<int> dis(55, 255);
+
+    std::unordered_set<int> usedColors;
+    std::vector<cv::Vec3b> randomColorList;
+
+    for (int i = 0; i < size; ++i) {
+        int colorValue;
+        cv::Vec3b color;
+        do {
+            // Generate random values for RGB
+            color[0] = static_cast<uchar>(dis(generator));
+            color[1] = static_cast<uchar>(dis(generator));
+            color[2] = static_cast<uchar>(dis(generator));
+
+            // Convert RGB to a single integer for uniqueness check
+            colorValue = bgr_to_hex(color);
+        } while (usedColors.count(colorValue) > 0);
+
+        usedColors.insert(colorValue);
+        randomColorList.push_back(color);
+    }
+
+    return randomColorList;
+}
+
+uchar check_bounds(uchar value)
+{
+    return (value + 10 > 255) ? ((value - 10 < 0) ? value + 10 : value - 10) : value - 10;
+}
+
+std::vector<int> generate_unique_BGR(cv::Mat const& img, std::vector<cv::Point> const& seeds) {
+    std::unordered_set<int> usedColors;
+    std::vector<int> colorList;
+    colorList.reserve(seeds.size());
+
+    for (auto seed : seeds) {
+        cv::Vec3b color = img.at<cv::Vec3b>(seed);
+        int hexColor = bgr_to_hex(color);
+
+        if (hexColor == 0) {
+            uchar bValue = check_bounds(color[0]);
+            color = {bValue, color[1], color[2]};
+            hexColor = bgr_to_hex(color);
+        }
+
+        while (usedColors.count(hexColor) > 0) {
+            uchar bValue = check_bounds(color[0]);
+            uchar gValue = check_bounds(color[1]);
+            uchar rValue = check_bounds(color[2]);
+            color = {bValue, gValue, rValue};
+            hexColor = bgr_to_hex(color);
+        }
+
+        usedColors.insert(hexColor);
+        colorList.push_back(hexColor);
+    }
+
+    return colorList;
+}
+
+void fill_mask(cv::Mat & mask, region_container & regions)
+{
+    for (auto& [key, value] : regions) {
+        cv::Vec3b color = hex_to_bgr(key);
+        for (auto& coords : value.first) {
+            mask.at<cv::Vec3b>(coords) = color;
+        }
+    }
+}
+
+void seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> const& seeds)
+{
+    cv::Mat hsvImg;
+    cv::cvtColor(src, hsvImg, cv::COLOR_BGR2HSV);
+
+    std::vector<cv::Mat> hsvChannels;
+    cv::split(hsvImg, hsvChannels);
+
+    region_container regions;
+
+    cv::Mat buffer = cv::Mat::zeros(src.size(), CV_32S);
+
+    size_t numSeeds = seeds.size();
+//    std::vector<int> colorList = generate_unique_BGR(src, seeds);
+    std::vector<cv::Vec3b> colorList = generate_random_unique_BGR(numSeeds);
+
+    for (size_t i = 0; i < numSeeds; ++i) {
+        growing(regions, hsvChannels, buffer, seeds[i], bgr_to_hex(colorList[i]));
+//        growing(regions, hsvChannels, buffer, seeds[i], colorList[i]);
     }
 }
 
@@ -229,7 +352,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    /*std::vector<cv::Point> seeds;
+    std::vector<cv::Point> seeds;
     int num = 10;
     if (argc == 3) {
         num = strtol(argv[2], nullptr, 10);
@@ -238,6 +361,7 @@ int main(int argc, char** argv) {
         generate_seed(seeds, image.cols, image.rows);
     }
 
+    /*
     cv::Mat imageWithseeds;
     display_seeds(image, imageWithseeds, seeds);
 
@@ -274,32 +398,29 @@ int main(int argc, char** argv) {
 
     cv::waitKey(0);*/
 
-    cv::Mat hsvImg;
+    /*cv::Mat hsvImg;
     cv::cvtColor(image, hsvImg, cv::COLOR_BGR2HSV);
 
     std::vector<cv::Mat> hsvChannels;
     cv::split(hsvImg, hsvChannels);
 
-//    cv::Point coords(349,29);
-//    uchar H = hsvChannels[0].at<uchar>(coords);
-//    uchar S = hsvChannels[1].at<uchar>(coords);
-//    uchar V = hsvChannels[2].at<uchar>(coords);
-//
-//    std::pair<cv::Scalar, cv::Scalar> bounds =
-//            interval_bounds({double(H), double(S), double(V)});
+    cv::Point coords(45,303);
+    uchar H = hsvChannels[0].at<uchar>(coords);
+    uchar S = hsvChannels[1].at<uchar>(coords);
+    uchar V = hsvChannels[2].at<uchar>(coords);
 
-//    bounds.first = cv::Scalar(0, 0, V-30);
-//    bounds.second = cv::Scalar(180, 45, V+30);
+    std::pair<cv::Scalar, cv::Scalar> bounds =
+            interval_bounds({double(H), double(S), double(V)});
 
-//    cv::Mat mask;
-//    cv::inRange(hsvImg, bounds.first, bounds.second, mask);
-//
-//    cv::Mat result;
-//    cv::bitwise_and(image, image, result, mask);
-//
-//    cv::imshow("Seg with HSV space color test", result);
-//
-//    cv::waitKey(0);
+    cv::Mat mask;
+    cv::inRange(hsvImg, bounds.first, bounds.second, mask);
+
+    cv::Mat result;
+    cv::bitwise_and(image, image, result, mask);
+
+    cv::imshow("Seg with HSV space color test", result);
+
+    cv::waitKey(0);*/
 
 //    cv::Point test(206,274);
 //    uchar valueH = hsvChannels[0].at<uchar>(test);
@@ -310,7 +431,7 @@ int main(int argc, char** argv) {
 
 //    bool res = predicate(lowerb, upperb, value);
 
-    region_container regions;
+    /*region_container regions;
 
     int hexR1 = bgr_to_hex(cv::Vec3b(255, 0, 0));
     int hexR2 = bgr_to_hex(cv::Vec3b(0, 0, 255));
@@ -357,11 +478,18 @@ int main(int argc, char** argv) {
         update_mean(regions[hexR2], tmp_hsv2);
         regions[hexR2].first.push_back(p2);
     }
+
+    merge(regions, hexR1, hexR2);*/
+
+    cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
     auto start = std::chrono::high_resolution_clock::now();
+    seg(image, mask, seeds);
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     std::cout << (duration.count() / 1000.0) << "ms" << std::endl;
-    merge(regions, hexR1, hexR2);
 
+    cv::namedWindow("Segmentation", cv::WINDOW_NORMAL);
+    cv::imshow("Segmentation", mask);
+    cv::waitKey(0);
     return 0;
 }
