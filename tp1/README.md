@@ -30,7 +30,7 @@ Voici le résultat:
 </center>
 
 
-### Tirage aléatoire
+### Tirage aléatoire (Pose de germs V1)
 
 Pour le tirage aléatoire (distribution uniforme), on tire deux valeurs $i$ et $j$:
 
@@ -49,6 +49,14 @@ On obtient ainsi un couple d'entier $(x,\ y)$ correspondant aux coordonnées d'u
 <center>
 <img src="./ressources/framing.png" alt="Diagramme de séquence traitement des messages" width="400"/>
 </center>
+
+### Variance et histogramme (Pose de germs V2)
+
+Incovénient de la première méthode : "Random selection randomly chooses a number of pixels as seed points without any prior knowledge or analysis of the image, but this method may not capture the main features and variations of the image."
+
+Après comparaison des histogramme sur les différents channels (HSV et GrayScale) nous allons exploiter le channel H. Les channels S et V seront prise en compte lors dans le criterion pour l'algorithme de growing.
+
+* [Linkedin - How do you choose the best seed points for region growing?](https://www.linkedin.com/advice/0/how-do-you-choose-best-seed-points-region?lang=en)
 
 ## Croissance
 
