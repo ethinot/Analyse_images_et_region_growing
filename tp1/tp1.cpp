@@ -210,6 +210,32 @@ void gnuPlot(const cv::Mat& hist, const std::string& fileName, const int histSiz
     }
 }
 
+std::vector<int> extractTopNHistogramValues(const cv::Mat& image, const cv::Rect& roi, int n) {
+    cv::Mat roiImage = image(roi); // region of interest
+
+    cv::Mat histogram;
+    int histSize = 180; 
+    float range[] = { 0, 179 }; 
+    const float* histRange = { range };
+    bool uniform = true;
+    bool accumulate = false;
+
+    cv::calcHist(&roiImage, 1, 0, cv::Mat(), histogram, 1, &histSize, &histRange, uniform, accumulate);
+
+    std::vector<int> topNValues;
+    for (int i = 0; i < n; ++i) {
+        double minValue, maxValue;
+        cv::Point minLoc, maxLoc;
+        cv::minMaxLoc(histogram, &minValue, &maxValue, &minLoc, &maxLoc);
+
+        topNValues.push_back(maxLoc.x);
+        
+        histogram.at<float>(maxLoc) = 0;
+    }
+
+    return topNValues;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) { 
         printf("usage: DisplayImage.out <Image_Path> (<num of germs>)\n"); 
