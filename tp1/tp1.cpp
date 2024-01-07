@@ -191,34 +191,82 @@ void segmentation(const std::vector<std::pair<int,int>>& germs, const cv::Mat& i
 #endif
 }
 
+void gnuPlot(const cv::Mat& hist, const std::string& fileName, const int histSize) {
+    std::ofstream dataFile("./ressources/" + fileName + ".txt");
+    for (int i = 0; i < histSize; i++) {
+        dataFile << i << " " << hist.at<float>(i) << std::endl;
+    }
+    dataFile.close();
+
+    FILE* gnuplotPipe = popen("gnuplot -persistent", "w");
+    if (gnuplotPipe) {
+        fprintf(gnuplotPipe, "set title 'Histogramme de %s'\n", fileName.c_str());
+        fprintf(gnuplotPipe, "plot './ressources/%s.txt' with boxes\n", fileName.c_str());
+        fflush(gnuplotPipe);
+        //getchar(); 
+        pclose(gnuplotPipe);
+    } else {
+        std::cerr << "Erreur lors de l'ouverture de Gnuplot." << std::endl;
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) { 
         printf("usage: DisplayImage.out <Image_Path> (<num of germs>)\n"); 
         return -1; 
     } 
 
-    cv::Mat image; 
-    image = cv::imread(argv[1], cv::IMREAD_COLOR); 
+    cv::Mat image_rgb, image_hsv, image_gray; 
+    image_rgb = cv::imread(argv[1]); //, cv::IMREAD_COLOR
 
-    if (!image.data) { 
+    if (!image_rgb.data) { 
         printf("No image data \n"); 
         return -1; 
     } 
 
-    std::vector<std::pair<int,int>> germs;
-    int num = 10;
-    if (argc == 3) { 
-        num = strtol(argv[2], nullptr, 10);
-        generate_germ(germs, image.cols, image.rows, num);
-    } else {
-        generate_germ(germs, image.cols, image.rows);
-    }
-    for(auto& germ: germs) std::cout << "[rows:" << germ.first << ", cols:" << germ.second << "]\n";
+    cv::cvtColor(image_rgb, image_hsv, cv::COLOR_BGR2HSV);
 
-    cv::Mat imageWithGerms;
-    color_germs(image, imageWithGerms, germs);
+    cv::cvtColor(image_rgb, image_gray, cv::COLOR_BGR2GRAY);
 
-    cv::Mat framing = image.clone();
+    std::vector<cv::Mat> hsv_channels;
+    cv::split(image_hsv, hsv_channels);
+
+    // Calculez les histogrammes pour chaque canal
+    int hist_size = 256; // Vous pouvez ajuster cela selon vos besoins
+    float range[] = {0, 256};
+    const float* hist_range = {range};
+
+    cv::Mat h_hist, s_hist, v_hist;
+    cv::calcHist(&hsv_channels[0], 1, 0, cv::Mat(), h_hist, 1, &hist_size, &hist_range, true, false);
+    cv::calcHist(&hsv_channels[1], 1, 0, cv::Mat(), s_hist, 1, &hist_size, &hist_range, true, false);
+    cv::calcHist(&hsv_channels[2], 1, 0, cv::Mat(), v_hist, 1, &hist_size, &hist_range, true, false);
+
+    cv::Mat g_hist;
+    cv::calcHist(&image_gray, 1, 0, cv::Mat(), g_hist, 1, &hist_size, &hist_range, true, false);
+
+    //cv::imshow("Histo 2D hsv", h_hist);
+    gnuPlot(h_hist, "Histo hsv - Teinte", hist_size);
+    // gnuPlot(s_hist, "Histo hsv - Saturation", hist_size);
+    // gnuPlot(v_hist, "Histo hsv - Luminaissance", hist_size);
+
+    // gnuPlot(g_hist, "Histo greyscale", hist_size);
+
+
+
+    // std::vector<std::pair<int,int>> germs;
+    // int num = 10;
+    // if (argc == 3) { 
+    //     num = strtol(argv[2], nullptr, 10);
+    //     generate_germ(germs, image.cols, image.rows, num);
+    // } else {
+    //     generate_germ(germs, image.cols, image.rows);
+    // }
+    // for(auto& germ: germs) std::cout << "[rows:" << germ.first << ", cols:" << germ.second << "]\n";
+
+    // cv::Mat imageWithGerms;
+    // color_germs(image, imageWithGerms, germs);
+
+    cv::Mat framing = image_rgb.clone();
     draw_framing(framing, 2);
 
     cv::imshow("Cadrillage", framing);
