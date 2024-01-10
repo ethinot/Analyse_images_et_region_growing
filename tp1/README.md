@@ -73,6 +73,13 @@ Variance du canal 2 : 232.429
 Variance V2 (moyennes des channels RGB) de l'image : 236.779
 ```
 
+Voici les étapes du calcule de la variance :
+1. L'opérateur `cv::cvtColor` permet de convertir l'image passé en paramètre en niveau de gris.
+2. Calcule de la moyenne des intensités de pixel dans l'image en niveau de gris `cv::mean(grayImage)`
+3. Calcule de la valeur absolue des différences entre les intensités de pixel de l'image (grayImage) et la moyenne (meanIntensity) `cv::absdiff(grayImage, meanIntensity, diff)`
+4. Le calcule de la multiplication élément par élément de la matrice diff avec elle-même revient à élever chaque différence au carré. On obtient ainsi les écarts quadratiques.
+5. Enfin, `cv::mean(diff)` permet de calculer la moyenne des écarts quadratiques. 
+
 #### Exploitation des histiogrammes :
 
 Après comparaison des histogramme sur les différents channels (HSV et GrayScale) nous allons exploiter le channel H. Les channels S et V seront prise en compte lors dans le criterion pour l'algorithme de growing.
