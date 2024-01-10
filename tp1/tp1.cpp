@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <list>
 #include <utility> // pair
 #include<cmath>
 #include<queue>
@@ -252,32 +253,62 @@ double calculate_variance_v1(const cv::Mat& image) {
     return variance.val[0];
 }
 
-// Deuxième méthode on calcule la variance de chaque plan (RGB) et combiner les résultats (moyenne)
+double calculate_region_variance(const cv::Mat& image, cv::Point topLeft, cv::Point bottomRight) {
+    if (topLeft.x < 0 || topLeft.y < 0 || bottomRight.x > image.cols || bottomRight.y > image.rows) {
 
-double calculate_channel_variance(const cv::Mat& channel) {
-    cv::Scalar meanIntensity = cv::mean(channel);
+        std::cerr << "Points de région invalides. TopLeft: " << topLeft << ", BottomRight: " << bottomRight << "\n Car :" << image.cols << "--" << image.rows << std::endl;
+        return -1.0;
+    }
+
+    cv::Mat roi = image(cv::Rect(topLeft, bottomRight));
+
+    cv::Mat grayRoi;
+    cv::cvtColor(roi, grayRoi, cv::COLOR_BGR2GRAY);
+
+    cv::Scalar meanIntensity = cv::mean(grayRoi);
     cv::Mat diff;
-    cv::absdiff(channel, meanIntensity, diff);
+    cv::absdiff(grayRoi, meanIntensity, diff);
     diff = diff.mul(diff);
     cv::Scalar variance = cv::mean(diff);
+
     return variance.val[0];
 }
 
-double calculate_variance_v2(const cv::Mat& image) {
-    std::vector<cv::Mat> channels;
-    cv::split(image, channels);
+void divide_image(const cv::Mat& image, cv::Point topLeft, cv::Point bottomRight, std::list<std::pair<cv::Point, cv::Point>>& result, int iterationLimit) {
+    static int iterationCounter = 0;
+    
+    double variance = calculate_region_variance(image, topLeft, bottomRight);
 
-    double varianceSum = 0.0;
+    std::cout << "Try to dividing: TopLeft: " << topLeft << ", BottomRight: " << bottomRight << std::endl;
 
-    for (int i = 0; i < 3; ++i) {
-        double channelVariance = calculate_channel_variance(channels[i]);
-        std::cout << "Variance du canal " << i << " : " << channelVariance << std::endl;
-        varianceSum += channelVariance;
+
+    if (iterationCounter < iterationLimit && variance > 50.0) {
+
+    
+        if (topLeft.x < bottomRight.x && topLeft.y < bottomRight.y) {
+            int midX = (topLeft.x + bottomRight.x) / 2;
+            int midY = (topLeft.y + bottomRight.y) / 2;
+
+            // Debug
+            std::cout << " -------------- Itération :  " << iterationCounter << std::endl;
+            std::cout << "Dividing: TopLeft: " << topLeft << ", BottomRight: " << bottomRight << " into : \n" 
+            << "    -> " << topLeft <<", " << cv::Point(midX, midY) <<"\n"
+            << "    -> " << cv::Point(midX, topLeft.y) <<", " << cv::Point(bottomRight.x, midY) <<"\n"
+            << "    -> " << cv::Point(topLeft.x, midY) <<", " << cv::Point(midX, bottomRight.y) <<"\n"
+            << "    -> " << cv::Point(midX, midY) <<", " << bottomRight <<"\n";
+
+            ++iterationCounter;
+            divide_image(image, topLeft, cv::Point(midX, midY), result, iterationLimit);
+            divide_image(image, cv::Point(midX, topLeft.y), cv::Point(bottomRight.x, midY), result, iterationLimit);
+            divide_image(image, cv::Point(topLeft.x, midY), cv::Point(midX, bottomRight.y), result, iterationLimit);
+            divide_image(image, cv::Point(midX, midY), bottomRight, result, iterationLimit);
+            --iterationCounter;
+        } else {
+            result.push_back(std::make_pair(topLeft, bottomRight));
+        }
+    } else {
+        result.push_back(std::make_pair(topLeft, bottomRight));
     }
-
-    double imageVariance = varianceSum / 3.0;
-
-    return imageVariance;
 }
 
 int main(int argc, char** argv) {
@@ -315,7 +346,7 @@ int main(int argc, char** argv) {
     cv::calcHist(&image_gray, 1, 0, cv::Mat(), g_hist, 1, &hist_size, &hist_range, true, false);
 
     //cv::imshow("Histo 2D hsv", h_hist);
-    gnuPlot(h_hist, "Histo hsv - Teinte", hist_size);
+    //gnuPlot(h_hist, "Histo hsv - Teinte", hist_size);
     // gnuPlot(s_hist, "Histo hsv - Saturation", hist_size);
     // gnuPlot(v_hist, "Histo hsv - Luminaissance", hist_size);
 
@@ -326,13 +357,46 @@ int main(int argc, char** argv) {
     double varianceV1 = calculate_variance_v1(image_rgb);
 
     std::cout << "Variance V1 (niveau de gris) de l'image : " << varianceV1 << std::endl;
+    //std::cout << "Variance chelou : " << calculate_region_variance(image_rgb, cv::Point(33,16), cv::Point(35,17)) << std::endl;
+    
     // Variance V1 (niveau de gris) de l'image en couleur : 237.172
 
-    double varianceV2 = calculate_variance_v2(image_rgb);
-    std::cout << "Variance V2 (moyennes des channels RGB) de l'image : " << varianceV2 << std::endl;
+    // std::list<cv::Mat> subImage; 
+    // std::list<cv::Mat>::iterator it; 
+
+    cv::Point initialTopLeft(0, 0);
+    cv::Point initialBottomRight(image_rgb.cols, image_rgb.rows);
+    std::list<std::pair<cv::Point, cv::Point>> result;
+
+    divide_image(image_rgb, initialTopLeft, initialBottomRight, result, 7);
+
+    std::cout << "Nombre de sous division : " << result.size() << std::endl;
+
+    std::cout << " \n Test variance  : " << calculate_region_variance(image_rgb, cv::Point(610,472), cv::Point(615,476)) << std::endl;
 
 
 
+    //split_image(image_rgb, cv::Point(0, 0), subImage);
+
+    //int count = 1;
+
+    // for (it = subImage.begin(); it != subImage.end(); ++it) {
+    //     if (count == 3) {
+    //         split_image(*it, cv::Point(0, 0), subImage);
+    //         std::list<cv::Mat>::iterator toErase = it;
+    //         ++it;
+    //     subImage.erase(toErase);
+    //     }
+    //     count++;
+    // }
+
+    // count = 1;
+    // for (it = subImage.begin(); it != subImage.end(); ++it) {
+    //     std::cout << "Sous image " << count << " : " << calculate_variance_v1(*it) << std::endl;
+    //     cv::imshow("Sous-image " + std::to_string(count), *it);
+    //     count++;
+    // }
+    
     // std::vector<std::pair<int,int>> germs;
     // int num = 10;
     // if (argc == 3) { 
@@ -346,10 +410,7 @@ int main(int argc, char** argv) {
     // cv::Mat imageWithGerms;
     // color_germs(image, imageWithGerms, germs);
 
-    cv::Mat framing = image_rgb.clone();
-    draw_framing(framing, 2);
-
-    cv::imshow("Cadrillage", framing);
+    //cv::imshow("Cadrillage", framing);
 
     cv::waitKey(0); 
 
