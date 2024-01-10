@@ -210,7 +210,7 @@ void gnuPlot(const cv::Mat& hist, const std::string& fileName, const int histSiz
     }
 }
 
-std::vector<int> extract_histogram_max_alues(const cv::Mat& image, const cv::Rect& roi, int n) {
+std::vector<int> extract_histogram_max_values(const cv::Mat& image, const cv::Rect& roi, int n) {
     cv::Mat roiImage = image(roi); // region of interest
 
     cv::Mat histogram;
@@ -234,6 +234,50 @@ std::vector<int> extract_histogram_max_alues(const cv::Mat& image, const cv::Rec
     }
 
     return topNValues;
+}
+
+
+// Première méthode on regroupe les trois channel (RGB) en un seul (niveau de gris)
+double calculate_variance_v1(const cv::Mat& image) {
+    cv::Mat grayImage;
+    cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+
+    cv::Scalar meanIntensity = cv::mean(grayImage);
+
+    cv::Mat diff;
+    cv::absdiff(grayImage, meanIntensity, diff);
+    diff = diff.mul(diff); 
+    cv::Scalar variance = cv::mean(diff);
+
+    return variance.val[0];
+}
+
+// Deuxième méthode on calcule la variance de chaque plan (RGB) et combiner les résultats (moyenne)
+
+double calculate_channel_variance(const cv::Mat& channel) {
+    cv::Scalar meanIntensity = cv::mean(channel);
+    cv::Mat diff;
+    cv::absdiff(channel, meanIntensity, diff);
+    diff = diff.mul(diff);
+    cv::Scalar variance = cv::mean(diff);
+    return variance.val[0];
+}
+
+double calculate_variance_v2(const cv::Mat& image) {
+    std::vector<cv::Mat> channels;
+    cv::split(image, channels);
+
+    double varianceSum = 0.0;
+
+    for (int i = 0; i < 3; ++i) {
+        double channelVariance = calculate_channel_variance(channels[i]);
+        std::cout << "Variance du canal " << i << " : " << channelVariance << std::endl;
+        varianceSum += channelVariance;
+    }
+
+    double imageVariance = varianceSum / 3.0;
+
+    return imageVariance;
 }
 
 int main(int argc, char** argv) {
@@ -276,6 +320,16 @@ int main(int argc, char** argv) {
     // gnuPlot(v_hist, "Histo hsv - Luminaissance", hist_size);
 
     // gnuPlot(g_hist, "Histo greyscale", hist_size);
+
+    // Variance :
+
+    double varianceV1 = calculate_variance_v1(image_rgb);
+
+    std::cout << "Variance V1 (niveau de gris) de l'image : " << varianceV1 << std::endl;
+    // Variance V1 (niveau de gris) de l'image en couleur : 237.172
+
+    double varianceV2 = calculate_variance_v2(image_rgb);
+    std::cout << "Variance V2 (moyennes des channels RGB) de l'image : " << varianceV2 << std::endl;
 
 
 
