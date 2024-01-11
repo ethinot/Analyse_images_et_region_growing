@@ -1,6 +1,7 @@
 #include "ImageProcessor.hpp"
 #include "SegmentedRegion.hpp"
 #include "GermsPositioning.hpp"
+#include "ImageUtil.hpp"
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -19,6 +20,14 @@ int main(int argc, char** argv) {
 
     // Accès aux données
     std::cout << point1 << ", " << point2 << ", on une variance de : " << variance <<std::endl;
+
+    ImageUtil imageUtil;
+    double varianceGrayscale, varianceHsv;
+    varianceGrayscale = imageUtil.calculate_variance(imageProcessor.get_image_rgb(), 0);
+    varianceHsv = imageUtil.calculate_variance(imageProcessor.get_image_rgb(), 1);
+
+    std::cout<<"Variance GrayScale : " << varianceGrayscale << std::endl;
+    std::cout<<"Variance HSV : " << varianceHsv << std::endl;
 
     return 0;
 }
