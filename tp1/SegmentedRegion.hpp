@@ -13,9 +13,11 @@ private:
 public:
     SegmentedRegion();
 
-    SegmentedRegion(cv::Point &, cv::Point &, double &);
+    SegmentedRegion(cv::Point &, cv::Point &, double);
     
     ~SegmentedRegion();
+
+    friend std::ostream& operator<<(std::ostream&, const SegmentedRegion&);
 
     const double getVariance() const;
     void setVariance(double &);
@@ -30,30 +32,38 @@ public:
 
 SegmentedRegion::SegmentedRegion() : topLeft(0, 0), bottomRight(0, 0), variance(0.0) { }
 
-SegmentedRegion::SegmentedRegion(cv::Point & _topLeft, cv::Point & _bottomRight, double & _variance) : topLeft(_topLeft), bottomRight(_bottomRight), variance(_variance) { }
+SegmentedRegion::SegmentedRegion(cv::Point & _topLeft, cv::Point & _bottomRight, double _variance) : topLeft(_topLeft), bottomRight(_bottomRight), variance(_variance) { }
 
 SegmentedRegion::~SegmentedRegion() { }
 
+std::ostream& operator<<(std::ostream& os, const SegmentedRegion& sr) {
+    os << "Segmented Region Info:\n"
+       << "Top Left Point : [" << sr.topLeft.x << ", " << sr.topLeft.y << "]\n"
+       << "Bottom Right Point : [" << sr.bottomRight.x << ", " << sr.bottomRight.y << "]\n"
+       << "Variance : " << sr.variance;
+    return os;
+}
+
 const double SegmentedRegion::getVariance() const {
-    return this->variance;
+    return variance;
 }
 
 void SegmentedRegion::setVariance(double & newVariance) {
-    this->variance = newVariance;
+    variance = newVariance;
 }
 
 const cv::Point SegmentedRegion::getTopLeftPoint() const {
-    return this->topLeft;
+    return topLeft;
 }
+
 void SegmentedRegion::setTopLeftPoint(cv::Point & newTopLeft) {
-    this->topLeft = newTopLeft;
+    topLeft = newTopLeft;
 }
 
 const cv::Point SegmentedRegion::getBottomRightPoint() const {
-    return this->bottomRight;
-
+    return bottomRight;
 }
 
 void SegmentedRegion::setBottomRightPoint(cv::Point & newBottomRight) {
-    this->bottomRight = newBottomRight;
+    bottomRight = newBottomRight;
 }
