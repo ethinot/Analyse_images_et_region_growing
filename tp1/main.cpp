@@ -13,20 +13,24 @@ int main(int argc, char** argv) {
     imageProcessor.process_image(argv[1]);
 
     ImageUtil imageUtil;
-    double variance;
+    double variance, varianceH, varianceS, varianceV;
 
     GermsPositioningV2 germsPositioning;
 
-    cv::Point initialTopLeft(0, 0);
-    cv::Point initialBottomRight(imageProcessor.get_image_rgb().cols, imageProcessor.get_image_rgb().rows);
+    varianceH = imageUtil.calculate_channel_variance(imageProcessor.get_image_hsv(), 0);
+    varianceS = imageUtil.calculate_channel_variance(imageProcessor.get_image_hsv(), 1);
+    varianceV = imageUtil.calculate_channel_variance(imageProcessor.get_image_hsv(), 2);
 
-    variance = imageUtil.calculate_region_variance(imageProcessor.get_image_rgb(), initialTopLeft, initialBottomRight);
+    std::cout << " Variance de la region primaire : " << variance <<std::endl;
+    std::cout << " Variance H (teinte) : " << varianceH <<std::endl;
+    std::cout << " Variance S (Sat) : " << varianceS <<std::endl;
+    std::cout << " Variance V (Value) : " << varianceV <<std::endl;
 
-    std::cout << " Variance la la region primaire : " << variance <<std::endl;
-
-    germsPositioning.divide_image(imageProcessor.get_image_rgb(), initialTopLeft, initialBottomRight, 7);
+    cv::Mat image = imageProcessor.get_image_rgb();
+    std::vector<cv::Point> seeds = germsPositioning.position_germs(image, 5);
 
     std::cout << "Nombre de sous division : " << germsPositioning.get_germs_regions().size() << std::endl;
+    std::cout << "Nombre de germe : " << seeds.size() << std::endl;
 
 
     return 0;
