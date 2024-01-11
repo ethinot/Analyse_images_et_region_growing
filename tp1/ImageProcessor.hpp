@@ -5,6 +5,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include <iostream>
+#include <cmath>
 
 class ImageProcessor {
 public:
@@ -28,6 +29,9 @@ public:
     void set_image_gray(const cv::Mat &);
 
     void process_image(const char* );
+
+    cv::Mat get_part_of_image(const cv::Point &, const cv::Point &) const;
+
 };
 
 ImageProcessor::ImageProcessor() : imageRgb(cv::Mat()), imageHsv(cv::Mat()), imageGray(cv::Mat()) { }
@@ -65,4 +69,8 @@ void ImageProcessor::process_image(const char* imagePath) {
 
     cv::cvtColor(imageRgb, imageHsv, cv::COLOR_BGR2HSV);
     cv::cvtColor(imageRgb, imageGray, cv::COLOR_BGR2GRAY);
+}
+
+cv::Mat ImageProcessor::get_part_of_image(const cv::Point &top_left, const cv::Point &bottom_right) const {
+   return imageRgb(cv::Rect(top_left, bottom_right));
 }
