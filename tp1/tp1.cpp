@@ -7,14 +7,15 @@
 #include <variant>
 #include <unordered_map>
 #include <unordered_set>
+#include <list>
 
 // opencv libs
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 
-std::chrono::steady_clock::time_point start;
-std::chrono::steady_clock::time_point stop;
+std::chrono::high_resolution_clock::time_point start;
+std::chrono::high_resolution_clock::time_point stop;
 
 std::chrono::microseconds duration;
 
@@ -356,7 +357,7 @@ double coverage(region_container const& regions, uint32_t cols, uint32_t rows)
 
 bool randomColorization = false;
 
-double seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> const& seeds, region_container & regions)
+void seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> const& seeds, region_container & regions)
 {
     cv::Mat hsvImg;
     cv::cvtColor(src, hsvImg, cv::COLOR_BGR2HSV);
