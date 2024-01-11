@@ -6,6 +6,7 @@
 #include "opencv2/imgproc.hpp"
 
 #include <iostream>
+#include "ostream"
 #include <list>
 #include <vector>
 #include <random>
@@ -57,9 +58,15 @@ public:
 
     void delete_germ(const std::list<SegmentedRegion>::iterator &);
 
+    bool separation_criterion(const cv::Point &, const cv::Point &, const double &) const;
+
     void divide_image(const cv::Mat &, cv::Point &, cv::Point &, int);
 
     void process_high_variance_region(const cv::Mat &image, cv::Point &topLeft, cv::Point &bottomRight, int iterationLimit, int &iterationCounter);
+
+    std::vector<cv::Point> position_germs(cv::Mat&, int);
+
+    friend std::ostream& operator<<(std::ostream&, const GermsPositioningV2&);
 };
 
 const std::list<SegmentedRegion>& GermsPositioningV2::get_germs_regions() const {
@@ -74,11 +81,23 @@ void GermsPositioningV2::delete_germ(const std::list<SegmentedRegion>::iterator 
     germsRegions.erase(it);
 }
 
+bool GermsPositioningV2::separation_criterion(const cv::Point & topLeft, const cv::Point & bottomRight, const double & variance) const {
+    float surface = imageUtil.pixel_surface(topLeft, bottomRight);
+    return surface >= 30 && variance >= 40.0;
+
+}
+
 void GermsPositioningV2::process_high_variance_region(const cv::Mat &image, cv::Point &topLeft, cv::Point &bottomRight,
                                                       int iterationLimit, int &iterationCounter) {
+
+    if (iterationCounter >= iterationLimit){
+        return;
+    }
+
     int midX = (topLeft.x + bottomRight.x) / 2;
     int midY = (topLeft.y + bottomRight.y) / 2;
     ++iterationCounter;
+
     cv::Point mid = cv::Point(midX, midY);
     cv::Point midTop = cv::Point(midX, topLeft.y);
     cv::Point midRight = cv::Point(bottomRight.x, midY);
@@ -88,14 +107,17 @@ void GermsPositioningV2::process_high_variance_region(const cv::Mat &image, cv::
     divide_image(image, midTop, midRight, iterationLimit);
     divide_image(image, leftMid, midBottom, iterationLimit);
     divide_image(image, mid, bottomRight, iterationLimit);
+
     --iterationCounter;
 }
+
+
 
 void GermsPositioningV2::divide_image(const cv::Mat &image, cv::Point &topLeft, cv::Point &bottomRight, int iterationLimit) {
     static int iterationCounter = 0;
     double variance = imageUtil.calculate_region_variance(image, topLeft, bottomRight);
 
-    if (iterationCounter < iterationLimit && variance > 50.0) {
+    if (separation_criterion(topLeft, bottomRight, variance)) {
         if (topLeft.x < bottomRight.x && topLeft.y < bottomRight.y) {
             process_high_variance_region(image, topLeft, bottomRight, iterationLimit, iterationCounter);
         } else {
@@ -105,3 +127,48 @@ void GermsPositioningV2::divide_image(const cv::Mat &image, cv::Point &topLeft, 
         add_germ(topLeft, bottomRight, variance);
     }
 }
+
+std::vector<cv::Point> GermsPositioningV2::position_germs(cv::Mat& image, int maxDivision) {
+    std::vector<cv::Point> seeds;
+
+    cv::Point initialTopLeft(0, 0);
+    cv::Point initialBottomRight(image.cols, image.rows);
+    divide_image(image, initialTopLeft, initialBottomRight, maxDivision);
+
+    for (const auto& germ : get_germs_regions()) {
+        seeds.push_back(imageUtil.calculate_middle_point(germ.getTopLeftPoint(), germ.getTopLeftPoint()));
+    }
+    return seeds;
+}
+
+std::ostream& operator<<(std::ostream& os, const GermsPositioningV2& gpv2)
+{
+    for (const auto& germ : gpv2.get_germs_regions()) {
+        os << "\n -------------------------------- \n";
+        os << germ;
+        os << "\n -------------------------------- \n";
+
+    }
+    return os;
+}
+
+//void GermsPositioningV2::position_germs(cv::Mat& imageHsv, int numSeeds) {
+//    double varianceH = imageUtil.calculate_channel_variance(imageHsv, 0);
+//    double varianceS = imageUtil.calculate_channel_variance(imageHsv, 1);
+//    double varianceV = imageUtil.calculate_channel_variance(imageHsv, 2);
+//
+//    int numSubintervals = numSeeds / 3;
+//    double stepH = 180.0 / numSubintervals;
+//    double stepS = 255.0 / numSubintervals;
+//    double stepV = 255.0 / numSubintervals;
+//
+//    // Positionner les graines au centre de chaque sous-intervalle
+//    for (int i = 0; i < numSubintervals; ++i) {
+//        int seedH = static_cast<int>(i * stepH + stepH / 2);
+//        int seedS = static_cast<int>(i * stepS + stepS / 2);
+//        int seedV = static_cast<int>(i * stepV + stepV / 2);
+//
+//        std::cout << "Seed " << i + 1 << ": H=" << seedH << ", S=" << seedS << ", V=" << seedV << std::endl;
+//    }
+//}
+
