@@ -14,6 +14,11 @@ public:
 
     double calculate_region_variance(const cv::Mat &, cv::Point &, cv::Point &);
 
+    float pixel_surface(cv::Point2f, cv::Point2f) const;
+
+    cv::Point calculate_middle_point(const cv::Point&, const cv::Point&);
+
+
 private:
     cv::Scalar calculate_mean_intensity(const cv::Mat &channel);
 
@@ -104,7 +109,18 @@ double ImageUtil::calculate_region_variance(const cv::Mat& image, cv::Point & to
 
     cv::Mat roi = image(cv::Rect(topLeft, bottomRight));
 
-    return calculate_variance(roi, 0);
+    return calculate_variance(roi, 1);
+}
+
+float ImageUtil::pixel_surface(cv::Point2f point1, cv::Point2f point2) const {
+    float dX = std::abs(point1.x - point2.x);
+    float dY = std::abs(point1.y - point2.y);
+
+    return dX * dY;
+}
+
+cv::Point ImageUtil::calculate_middle_point(const cv::Point& point1, const cv::Point& point2) {
+    return cv::Point2f((point1.x + point2.x) / 2, (point1.y + point2.y) / 2);
 }
 
 class GermsDisplay {
