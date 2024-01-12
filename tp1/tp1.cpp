@@ -1,7 +1,10 @@
 #include <iostream>
 #include <random>
-#include <cstdlib> // strtol, rand, srand ... 
+#include <cstdlib> // strtol, rand, srand ...
 #include <vector>
+#include <list>
+#include <utility> // pair
+#include<cmath>
 #include<queue>
 #include <chrono>
 #include <variant>
@@ -421,11 +424,11 @@ int main(int argc, char** argv) {
 
     if (argc == 3) {
         numSeeds = strtol(argv[2], nullptr, 10);
-    } 
+    }
 
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
     rg_seg(image, mask);
-    
+
 
 //    cv::namedWindow("Segmentation", cv::WINDOW_NORMAL);
     cv::imshow("Segmentation", mask);

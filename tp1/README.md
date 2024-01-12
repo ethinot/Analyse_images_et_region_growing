@@ -30,7 +30,7 @@ Voici le résultat:
 </center>
 
 
-### Tirage aléatoire
+### Tirage aléatoire (Pose de germs V1)
 
 Pour le tirage aléatoire (distribution uniforme), on tire deux valeurs $i$ et $j$:
 
@@ -49,6 +49,44 @@ On obtient ainsi un couple d'entier $(x,\ y)$ correspondant aux coordonnées d'u
 <center>
 <img src="./ressources/framing.png" alt="Diagramme de séquence traitement des messages" width="400"/>
 </center>
+
+### Variance et histogramme (Pose de germs V2)
+
+**Incovénient de la première méthode** : La selection de germs aléatoire, sans exploiter des connaissances que nous apporte une analyse primaire de l'image n'est pas recommandé. En effet, avec cette méthode il est possible de passer à coté de la caractéristique recherchée.
+
+#### Calcule de la variance d'une image :
+
+La variance nous permet de mesuree la dispersion des valeurs d'intensité des pixels dans une image. Plus la variance est élevée, plus les valeurs d'intensité des pixels sont dispersées, ce qui nous renseigne sur la diversité de couleurs et de contrastes dans l'image.
+
+Pour calculer la variance d'une image, deux méhtode principales s'offres à nous :
+
+1. Version 1 (V1) - Regrouper les trois channel (RGB) en un seul (niveau de gris), puis calculer la variance
+2. Version 2 (V2) Calculer la variance de chaque plan (RGB) et combiner les résultats (moyenne / médiane)
+
+Une baterie de tests nous permet de choisir la version 1 car, la différence entre les résultat sont négligable et la version 1 est moins couteuse (1 seul calcule de variance au lieu de trois).
+
+```
+Variance V1 (niveau de gris) de l'image : 237.172
+Variance du canal 0 : 239.409
+Variance du canal 1 : 238.5
+Variance du canal 2 : 232.429
+Variance V2 (moyennes des channels RGB) de l'image : 236.779
+```
+
+Voici les étapes du calcule de la variance :
+1. L'opérateur `cv::cvtColor` permet de convertir l'image passé en paramètre en niveau de gris.
+2. Calcule de la moyenne des intensités de pixel dans l'image en niveau de gris `cv::mean(grayImage)`
+3. Calcule de la valeur absolue des différences entre les intensités de pixel de l'image (grayImage) et la moyenne (meanIntensity) `cv::absdiff(grayImage, meanIntensity, diff)`
+4. Le calcule de la multiplication élément par élément de la matrice diff avec elle-même revient à élever chaque différence au carré. On obtient ainsi les écarts quadratiques.
+5. Enfin, `cv::mean(diff)` permet de calculer la moyenne des écarts quadratiques. 
+
+#### Exploitation des histiogrammes :
+
+Après comparaison des histogramme sur les différents channels (HSV et GrayScale) nous allons exploiter le channel H. Les channels S et V seront prise en compte lors dans le criterion pour l'algorithme de growing.
+
+* [Article Linkedin - How do you choose the best seed points for region growing?](https://www.linkedin.com/advice/0/how-do-you-choose-best-seed-points-region?lang=en)
+
+* [Forum Developpez.com - Image et Variance](https://www.developpez.net/forums/d836328/general-developpement/algorithme-mathematiques/traitement-d-images/image-variance/)
 
 ## Croissance
 
