@@ -11,7 +11,6 @@
 #include <vector>
 #include <random>
 
-
 class GermsPositioningV1 {
 private:
     ImageUtil imageUtil;
@@ -61,13 +60,19 @@ public:
 
     void delete_germ(const std::list<SegmentedRegion>::iterator &);
 
-    bool separation_criterion(const cv::Point &, const cv::Point &, const double &) const;
+    bool variance_criterion(const double & variance, const double limit) const;
+    bool iteration_criterion(const int iterationLimit, const int iterationCounter) const;
+    bool surface_criterion(const cv::Point & topLeft, const cv::Point & bottomRight, const float limit) const;
+
+    bool separation_criterion(const double &, const int, const int, const cv::Point &, const cv::Point &) const;
 
     void divide_image(const cv::Mat &, cv::Point &, cv::Point &, int);
 
     void process_high_variance_region(const cv::Mat &image, cv::Point &topLeft, cv::Point &bottomRight, int iterationLimit, int &iterationCounter);
 
-    std::vector<cv::Point> position_germs(cv::Mat&, int);
+    void add_region_germ(std::vector<cv::Point> &);
+
+    void position_germs(cv::Mat&, int, std::vector<cv::Point> &);
 
     friend std::ostream& operator<<(std::ostream&, const GermsPositioningV2&);
 };
@@ -84,65 +89,92 @@ void GermsPositioningV2::delete_germ(const std::list<SegmentedRegion>::iterator 
     germsRegions.erase(it);
 }
 
-bool GermsPositioningV2::separation_criterion(const cv::Point & topLeft, const cv::Point & bottomRight, const double & variance) const {
+bool GermsPositioningV2::variance_criterion(const double & variance, const double limit) const {
+    return variance >= limit;
+}
 
+bool GermsPositioningV2::iteration_criterion(const int iterationLimit, const int iterationCounter) const {
+    return (iterationCounter <= iterationLimit);
+}
+
+bool GermsPositioningV2::surface_criterion(const cv::Point & topLeft, const cv::Point & bottomRight, const float limit) const {
     float surface = imageUtil.pixel_surface(topLeft, bottomRight);
-    return surface >= 30 && variance >= 40.0;
+    return surface >= limit;
+}
 
+// Return true if the separation is possible
+bool GermsPositioningV2::separation_criterion(const double & variance, const int iterationLimit, const int iterationCounter,
+                                              const cv::Point & topLeft, const cv::Point & bottomRight) const {
+    bool isVariance = variance_criterion(variance, 40.0);
+    bool isIteration = iteration_criterion(iterationLimit, iterationCounter);
+    bool isSurface = surface_criterion(topLeft, bottomRight, 30);
+    return isVariance && isIteration && isSurface;
 }
 
 void GermsPositioningV2::process_high_variance_region(const cv::Mat &image, cv::Point &topLeft, cv::Point &bottomRight,
                                                       int iterationLimit, int &iterationCounter) {
 
-    if (iterationCounter >= iterationLimit){
-        return;
-    }
-
     int midX = (topLeft.x + bottomRight.x) / 2;
     int midY = (topLeft.y + bottomRight.y) / 2;
-    ++iterationCounter;
 
     cv::Point mid = cv::Point(midX, midY);
     cv::Point midTop = cv::Point(midX, topLeft.y);
     cv::Point midRight = cv::Point(bottomRight.x, midY);
     cv::Point leftMid = cv::Point(topLeft.x, midY);
     cv::Point midBottom = cv::Point(midX, bottomRight.y);
-    divide_image(image, topLeft, mid, iterationLimit);
-    divide_image(image, midTop, midRight, iterationLimit);
-    divide_image(image, leftMid, midBottom, iterationLimit);
-    divide_image(image, mid, bottomRight, iterationLimit);
+
+    ++iterationCounter;
+
+    if(iteration_criterion(iterationLimit, iterationCounter)) {
+        divide_image(image, topLeft, mid, iterationLimit);
+        divide_image(image, midTop, midRight, iterationLimit);
+        divide_image(image, leftMid, midBottom, iterationLimit);
+        divide_image(image, mid, bottomRight, iterationLimit);
+    } else {
+        add_germ(topLeft, bottomRight, -1);
+    }
 
     --iterationCounter;
+
 }
-
-
 
 void GermsPositioningV2::divide_image(const cv::Mat &image, cv::Point &topLeft, cv::Point &bottomRight, int iterationLimit) {
     static int iterationCounter = 0;
     double variance = imageUtil.calculate_region_variance(image, topLeft, bottomRight);
 
-    if (separation_criterion(topLeft, bottomRight, variance)) {
+    //std::cout << "Iteration - "<< iterationCounter << "\n -- Try to split : "<< topLeft << "," << bottomRight << std::endl;
+    //std::cout << "  Variance --> "<< variance << std::endl;
+    //std::cout << "  Surface --> "<< imageUtil.pixel_surface(topLeft, bottomRight) << std::endl;
+
+
+    bool criterion = separation_criterion(variance, iterationLimit, iterationCounter, topLeft, bottomRight);
+    //std::cout << "  Can split ? --> " << (criterion ? " yes ! \n" : " no \n");
+
+    if (criterion) {
         if (topLeft.x < bottomRight.x && topLeft.y < bottomRight.y) {
             process_high_variance_region(image, topLeft, bottomRight, iterationLimit, iterationCounter);
         } else {
-            add_germ(topLeft, bottomRight, variance);
+            std::cerr << "Top left and bottom right pixels are not respecting the condition: topLeft.x < bottomRight.x and topLeft.y < bottomRight.y\n";
+            return;
         }
     } else {
         add_germ(topLeft, bottomRight, variance);
     }
 }
 
-std::vector<cv::Point> GermsPositioningV2::position_germs(cv::Mat& image, int maxDivision) {
-    std::vector<cv::Point> seeds;
+void GermsPositioningV2::add_region_germ(std::vector<cv::Point> & seeds) {
+    for (const auto& germ : get_germs_regions()) {
+        seeds.push_back(imageUtil.calculate_middle_point(germ.getTopLeftPoint(), germ.getBottomRightPoint()));
+    }
+}
 
+void GermsPositioningV2::position_germs(cv::Mat& image, int maxDivision, std::vector<cv::Point> & seeds) {
     cv::Point initialTopLeft(0, 0);
     cv::Point initialBottomRight(image.cols, image.rows);
+
     divide_image(image, initialTopLeft, initialBottomRight, maxDivision);
 
-    for (const auto& germ : get_germs_regions()) {
-        seeds.push_back(imageUtil.calculate_middle_point(germ.getTopLeftPoint(), germ.getTopLeftPoint()));
-    }
-    return seeds;
+    add_region_germ(seeds);
 }
 
 std::ostream& operator<<(std::ostream& os, const GermsPositioningV2& gpv2)
@@ -155,24 +187,3 @@ std::ostream& operator<<(std::ostream& os, const GermsPositioningV2& gpv2)
     }
     return os;
 }
-
-//void GermsPositioningV2::position_germs(cv::Mat& imageHsv, int numSeeds) {
-//    double varianceH = imageUtil.calculate_channel_variance(imageHsv, 0);
-//    double varianceS = imageUtil.calculate_channel_variance(imageHsv, 1);
-//    double varianceV = imageUtil.calculate_channel_variance(imageHsv, 2);
-//
-//    int numSubintervals = numSeeds / 3;
-//    double stepH = 180.0 / numSubintervals;
-//    double stepS = 255.0 / numSubintervals;
-//    double stepV = 255.0 / numSubintervals;
-//
-//    // Positionner les graines au centre de chaque sous-intervalle
-//    for (int i = 0; i < numSubintervals; ++i) {
-//        int seedH = static_cast<int>(i * stepH + stepH / 2);
-//        int seedS = static_cast<int>(i * stepS + stepS / 2);
-//        int seedV = static_cast<int>(i * stepV + stepV / 2);
-//
-//        std::cout << "Seed " << i + 1 << ": H=" << seedH << ", S=" << seedS << ", V=" << seedV << std::endl;
-//    }
-//}
-
