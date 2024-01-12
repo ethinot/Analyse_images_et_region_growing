@@ -11,19 +11,6 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 
-std::chrono::high_resolution_clock::time_point start;
-std::chrono::high_resolution_clock::time_point stop;
-
-std::chrono::microseconds duration;
-
-#define MEASURE_TIME(func) \
-        start = std::chrono::high_resolution_clock::now(); \
-        func; \
-        stop = std::chrono::high_resolution_clock::now(); \
-        duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); \
-        std::cout << "Time taken by " << #func << ": " << (duration.count() / 1000.0) << "ms" << std::endl; \
-
-
 std::mt19937 generator{ std::random_device{}() };
 
 class GrowAndMerge {
@@ -393,9 +380,10 @@ void GrowAndMerge::seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point>
 
 void GrowAndMerge::rg_seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> & seeds) {
     cv::Mat buffer = cv::Mat::zeros(src.size(), CV_32S);
-    MEASURE_TIME(seg(src, buffer, seeds, regions));
 
-    MEASURE_TIME(fill_mask(buffer, dst));
+    seg(src, buffer, seeds, regions);
+
+    fill_mask(buffer, dst);
 
     std::cout << "Coverage percentage: " << coverage(regions, src.cols, src.rows) << "%" << std::endl;
 }
