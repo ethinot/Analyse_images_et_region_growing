@@ -17,21 +17,14 @@ private:
     ImageUtil imageUtil;
 
 public:
-    void generate_germ(std::vector<std::pair<int, int>> &, unsigned int, unsigned int, unsigned int);
+    cv::Point rand_germ_position(int, int, int, int);
 
-    std::pair<int, int> rand_germ_position(int, int, int, int);
+    void generate_seed(std::vector<cv::Point>&, uint32_t, uint32_t, uint32_t);
 };
 
 // GermsPositioningV1 implementations :
 
-void GermsPositioningV1::generate_germ(std::vector<std::pair<int, int>> & buffer, unsigned int width, unsigned int height, unsigned int numOfGerm = 10) {
-    int numCaseW, numCaseH, caseWidth, caseHeight;
-    imageUtil.framing(width, height, numCaseW, numCaseH, caseWidth, caseHeight);
-    for(unsigned int i = 0; i < numOfGerm; ++i)
-    buffer.push_back(rand_germ_position(numCaseW, numCaseH, caseWidth, caseHeight));
-}
-
-std::pair<int, int> GermsPositioningV1::rand_germ_position(int numCaseW, int numCaseH, int caseWidth, int caseHeight) {
+cv::Point GermsPositioningV1::rand_germ_position(int numCaseW, int numCaseH, int caseWidth, int caseHeight) {
     std::mt19937 generator{ std::random_device{}() };
     std::uniform_int_distribution<> distribNCaseW(0, numCaseW - 1);
     std::uniform_int_distribution<> distribNCaseH(0, numCaseH - 1);
@@ -41,7 +34,17 @@ std::pair<int, int> GermsPositioningV1::rand_germ_position(int numCaseW, int num
     std::uniform_int_distribution<> distribPosY(caseHeight * j, caseHeight * j + caseHeight);
     int px = distribPosX(generator);
     int py = distribPosY(generator);
-    return std::pair<int, int>(py, px); // (row,col)
+    return {px,py}; // (row,col)
+}
+
+void GermsPositioningV1::generate_seed(std::vector<cv::Point>& seeds, uint32_t w, uint32_t h, uint32_t numSeeds=10) {
+    int numC, numR, caseW, caseH;
+    imageUtil.framing(w, h, numC, numR, caseW, caseH);
+    for(uint32_t i = 0; i < numSeeds; ++i) {
+        cv::Point seed;
+        seed = rand_germ_position(numC, numR, caseW, caseH);
+        seeds.push_back(seed);
+    }
 }
 
 class GermsPositioningV2 {
@@ -82,6 +85,7 @@ void GermsPositioningV2::delete_germ(const std::list<SegmentedRegion>::iterator 
 }
 
 bool GermsPositioningV2::separation_criterion(const cv::Point & topLeft, const cv::Point & bottomRight, const double & variance) const {
+
     float surface = imageUtil.pixel_surface(topLeft, bottomRight);
     return surface >= 30 && variance >= 40.0;
 
