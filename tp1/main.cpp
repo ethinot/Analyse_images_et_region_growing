@@ -18,34 +18,13 @@ std::chrono::microseconds duration;
 
 
 int main(int argc, char** argv) {
-//    if (argc < 2) {
-//        printf("Enter relative path to an image.\n");
-//        return -1;
-//    }
-//
-//    ImageProcessor imageProcessor;
-//    imageProcessor.process_image(argv[1]);
-//
-//    ImageUtil imageUtil;
-//    double varianceH, varianceS, varianceV;
-//
-//    GermsPositioningV2 germsPositioning;
-//
-//    varianceH = imageUtil.calculate_channel_variance(imageProcessor.get_image_hsv(), 0);
-//    varianceS = imageUtil.calculate_channel_variance(imageProcessor.get_image_hsv(), 1);
-//    varianceV = imageUtil.calculate_channel_variance(imageProcessor.get_image_hsv(), 2);
-//
-//    std::cout << " Variance H (teinte) : " << varianceH <<std::endl;
-//    std::cout << " Variance S (Sat) : " << varianceS <<std::endl;
-//    std::cout << " Variance V (Value) : " << varianceV <<std::endl;
-//
-//    cv::Mat image = imageProcessor.get_image_rgb();
-//    std::vector<cv::Point> seeds = germsPositioning.position_germs(image, 4);
-//
-//    std::cout << "Nombre de sous division : " << germsPositioning.get_germs_regions().size() << std::endl;
-//    std::cout << "Nombre de germe : " << seeds.size() << std::endl;
+    if (argc < 2) {
+        printf("Enter relative path to an image.\n");
+        return -1;
+    }
 
-    //    auto start = std::chrono::high_resolution_clock::now();
+    ImageProcessor imageProcessor;
+    imageProcessor.process_image(argv[1]);
 
     // Test growing
 
@@ -99,7 +78,19 @@ int main(int argc, char** argv) {
     cv::imshow("Segmentation", mask);
     cv::imshow("Germs and regions", germsAndRegion);
 
-    cv::waitKey(0);
+    cv::Mat original = imageProcessor.get_image_original();
+    cv::Mat rgbFiltered = imageProcessor.get_image_rgb();
 
+    cv::imshow("Original", original);
+    cv::imshow("RGB filtered", rgbFiltered);
+
+    ImageUtil imageUtil;
+    double vO = imageUtil.calculate_variance(original, false);
+    double vF = imageUtil.calculate_variance(rgbFiltered, false);
+
+    std::cout << "Variance original : " << vO << std::endl;
+    std::cout << "Variance filtrer : " << vF << std::endl;
+
+    cv::waitKey(0);
     return 0;
 }
