@@ -30,8 +30,8 @@ int main(int argc, char** argv) {
 
     GrowAndMerge growAndMerge;
 
-    if (argc < 2) {
-        printf("usage: DisplayImage.out <Image_Path> (<num of seeds>)\n");
+    if (argc < 3) {
+        printf("usage: DisplayImage.out <Image_Path> <show_edge (0 or 1)> (<num of seeds>)\n");
         return -1;
     }
 
@@ -43,8 +43,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    if (argc == 3) {
-        growAndMerge.set_num_seeds(strtol(argv[2], nullptr, 10));
+    if (argc == 4) {
+        growAndMerge.set_num_seeds(strtol(argv[3], nullptr, 10));
     }
 
     GermsPositioningV1 positioningV1;
@@ -62,7 +62,8 @@ int main(int argc, char** argv) {
 
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
 
-    MEASURE_TIME(growAndMerge.rg_seg(image, mask, seedsV2));
+    bool showEdge = std::stoi(argv[2]) != 0;
+    MEASURE_TIME(growAndMerge.rg_seg(image, mask, seedsV2, showEdge));
 
     GermsDisplay germsDisplay;
 

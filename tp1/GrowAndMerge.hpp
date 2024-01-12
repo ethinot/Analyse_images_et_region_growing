@@ -52,7 +52,6 @@ private:
     // O(1)
     void process(region_container &, std::vector<cv::Mat> const&, cv::Mat &, std::queue<cv::Point> &, cv::Point const&, int &);
 
-    // O(w) avec w nombre de pixels parcourus
     void growing(region_container &, std::vector<cv::Mat> const&, cv::Mat &, cv::Point const&, int);
 
     std::vector<cv::Vec3b> generate_random_unique_BGR(size_t);
@@ -61,7 +60,11 @@ private:
 
     std::vector<int> generate_unique_BGR(cv::Mat const&, std::vector<cv::Point> const&);
 
-    void fill_mask(cv::Mat const& buffer, cv::Mat & mask);
+    void fill_mask(cv::Mat const&, cv::Mat &);
+
+    bool is_edge(cv::Mat const&, cv::Point const&);
+
+    void edge_mask(cv::Mat const&, cv::Mat &);
 
     double coverage(region_container const&, uint32_t, uint32_t);
 
@@ -70,13 +73,13 @@ private:
 public:
     const region_container& get_regions() const;
 
-    void set_regions(const region_container& regions);
+    void set_regions(const region_container&);
 
     int get_num_seeds() const; // getter method
 
-    void set_num_seeds(int seeds); // setter method
+    void set_num_seeds(int); // setter method
 
-    void rg_seg(cv::Mat const&, cv::Mat &, std::vector<cv::Point> &);
+    void rg_seg(cv::Mat const&, cv::Mat &, std::vector<cv::Point> &, bool onlyEdge=false);
 };
 
 const GrowAndMerge::region_container& GrowAndMerge::get_regions() const {
@@ -338,6 +341,33 @@ void GrowAndMerge::fill_mask(cv::Mat const& buffer, cv::Mat & mask) {
     }
 }
 
+bool GrowAndMerge::is_edge(cv::Mat const& buffer, cv::Point const& pixel) {
+    if (pixel.x-1 >= 0 && buffer.at<int>(pixel.y, pixel.x-1) != buffer.at<int>(pixel)) {
+        return true;
+    }
+    if (pixel.x+1 < buffer.cols && buffer.at<int>(pixel.y, pixel.x+1) != buffer.at<int>(pixel)) {
+        return true;
+    }
+    if (pixel.y-1 >= 0 && buffer.at<int>(pixel.y-1, pixel.x) != buffer.at<int>(pixel)) {
+        return true;    
+    }
+    if (pixel.x+1 < buffer.rows && buffer.at<int>(pixel.y+1, pixel.x) != buffer.at<int>(pixel)) {
+        return true;
+    }
+    return false;
+}
+
+void GrowAndMerge::edge_mask(cv::Mat const& buffer, cv::Mat & mask) {
+    for (int i = 0; i < buffer.rows; ++i) {
+        for (int j = 0; j < buffer.cols; ++j) {
+            cv::Point pixel(j, i);
+            if (is_edge(buffer, pixel)) {
+                mask.at<cv::Vec3b>(i, j) = hex_to_bgr(buffer.at<int>(i, j));
+            }
+        }
+    }
+}
+
 double GrowAndMerge::coverage(region_container const& regions, uint32_t cols, uint32_t rows) {
     size_t count = 0;
     for (auto const& [key, value]: regions) {
@@ -378,12 +408,16 @@ void GrowAndMerge::seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point>
 
 // Public method implementation :
 
-void GrowAndMerge::rg_seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> & seeds) {
+void GrowAndMerge::rg_seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Point> & seeds, bool onlyEdge) {
     cv::Mat buffer = cv::Mat::zeros(src.size(), CV_32S);
 
     seg(src, buffer, seeds, regions);
 
-    fill_mask(buffer, dst);
+    if (onlyEdge) {
+        edge_mask(buffer, dst);
+    } else {
+        fill_mask(buffer, dst);
+    }
 
     std::cout << "Coverage percentage: " << coverage(regions, src.cols, src.rows) << "%" << std::endl;
 }
