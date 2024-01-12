@@ -14,7 +14,7 @@ public:
 
     double calculate_region_variance(const cv::Mat &, cv::Point &, cv::Point &);
 
-    float pixel_surface(cv::Point2f, cv::Point2f) const;
+    float pixel_surface(cv::Point, cv::Point) const;
 
     cv::Point calculate_middle_point(const cv::Point&, const cv::Point&);
 
@@ -112,7 +112,7 @@ double ImageUtil::calculate_region_variance(const cv::Mat& image, cv::Point & to
     return calculate_variance(roi, 1);
 }
 
-float ImageUtil::pixel_surface(cv::Point2f point1, cv::Point2f point2) const {
+float ImageUtil::pixel_surface(cv::Point point1, cv::Point point2) const {
     float dX = std::abs(point1.x - point2.x);
     float dY = std::abs(point1.y - point2.y);
 
