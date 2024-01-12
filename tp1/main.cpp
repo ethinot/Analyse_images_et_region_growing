@@ -4,6 +4,19 @@
 #include "GrowAndMerge.hpp"
 #include "ImageUtil.hpp"
 
+std::chrono::high_resolution_clock::time_point start;
+std::chrono::high_resolution_clock::time_point stop;
+
+std::chrono::microseconds duration;
+
+#define MEASURE_TIME(func) \
+        start = std::chrono::high_resolution_clock::now(); \
+        func; \
+        stop = std::chrono::high_resolution_clock::now(); \
+        duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); \
+        std::cout << "Time taken by " << #func << ": " << (duration.count() / 1000.0) << "ms" << std::endl; \
+
+
 int main(int argc, char** argv) {
 //    if (argc < 2) {
 //        printf("Enter relative path to an image.\n");
@@ -57,16 +70,35 @@ int main(int argc, char** argv) {
 
     GermsPositioningV1 positioningV1;
 
-    std::vector<cv::Point> seeds;
+    GermsPositioningV2 positioningV2;
 
-    positioningV1.generate_seed(seeds, image.cols, image.rows, growAndMerge.get_num_seeds());
+    std::vector<cv::Point> seedsV1;
+
+    std::vector<cv::Point> seedsV2;
+
+
+    MEASURE_TIME(positioningV1.generate_seed(seedsV1, image.cols, image.rows, growAndMerge.get_num_seeds()));
+
+    MEASURE_TIME(positioningV2.position_germs(image, 4, seedsV2));
 
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
-    growAndMerge.rg_seg(image, mask, seeds);
 
+    MEASURE_TIME(growAndMerge.rg_seg(image, mask, seedsV2));
 
-//    cv::namedWindow("Segmentation", cv::WINDOW_NORMAL);
+    GermsDisplay germsDisplay;
+
+    cv::Mat germsAndRegion;
+
+    germsDisplay.display_germs(image, germsAndRegion, seedsV2);
+
+    germsDisplay.display_segmented_regions(image, germsAndRegion, positioningV2.get_germs_regions(), cv::Scalar(0, 150, 0));
+
+    std::cout << "Nombre de germe V1 : " << seedsV1.size() << std::endl;
+    std::cout << "Nombre de germe V2 : " << seedsV2.size() << std::endl;
+
     cv::imshow("Segmentation", mask);
+    cv::imshow("Germs and regions", germsAndRegion);
+
     cv::waitKey(0);
 
     return 0;
