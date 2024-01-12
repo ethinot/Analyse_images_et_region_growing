@@ -1,5 +1,10 @@
 #pragma once
 
+#include "GermsPositioning.hpp"
+
+#include <list>
+
+
 class ImageUtil {
 public:
     void framing(unsigned int, unsigned int, int&, int&, int&, int&);
@@ -120,13 +125,14 @@ float ImageUtil::pixel_surface(cv::Point point1, cv::Point point2) const {
 }
 
 cv::Point ImageUtil::calculate_middle_point(const cv::Point& point1, const cv::Point& point2) {
-    return cv::Point2f((point1.x + point2.x) / 2, (point1.y + point2.y) / 2);
+    return cv::Point((point1.x + point2.x) / 2, (point1.y + point2.y) / 2);
 }
 
 class GermsDisplay {
 public:
     void draw_framing(cv::Mat &, int, cv::Scalar);
-    void display_germs(cv::Mat const &, cv::Mat &, std::vector<std::pair<int, int>> const &);
+    void display_germs(cv::Mat const &, cv::Mat &, std::vector<cv::Point> const &);
+    void display_segmented_regions(cv::Mat const &, cv::Mat const &, const std::list<SegmentedRegion> &, cv::Scalar);
 };
 
 // Implementation :
@@ -156,13 +162,19 @@ void GermsDisplay::draw_framing(cv::Mat & image, int thickness = 2, cv::Scalar c
     }
 }
 
-void GermsDisplay::display_germs(cv::Mat const & src, cv::Mat & dst, std::vector<std::pair<int, int>> const & germs) {
+void GermsDisplay::display_germs(cv::Mat const & src, cv::Mat & dst, std::vector<cv::Point> const & germs) {
     dst = src.clone();
     for(auto& germ : germs) {
-        cv::Point center(germ.second, germ.first); // (col,row)
+        cv::Point center(germ.x, germ.y); // (col,row)
         int radius = 10;
         cv::Scalar line_color(0,0,255);
         int thickness = 1;
         cv::circle(dst, center, radius, line_color, thickness);
+    }
+}
+
+void GermsDisplay::display_segmented_regions(cv::Mat const & src, cv::Mat const & dst, const std::list<SegmentedRegion> & segmentedRegions, cv::Scalar color) {
+    for (const auto& region : segmentedRegions) {
+        cv::rectangle(dst, region.getTopLeftPoint(), region.getBottomRightPoint(), color);
     }
 }
