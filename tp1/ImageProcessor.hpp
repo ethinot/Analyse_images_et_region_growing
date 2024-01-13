@@ -77,6 +77,10 @@ void ImageProcessor::set_image_gray(const cv::Mat &image) {
 
 // For the Kernel Size : 3 or 5 is a good values
 void ImageProcessor::filter_image_noise(int kernelSize) {
+    /* Todo : Teste other filter
+     *  cv::medianBlur(image, imageTmp, 3);
+     *  cv::bilateralFilter(imageTmp, imageFiltree, -1, 40, .?.)
+     */
     cv::GaussianBlur(imageRgb, imageRgb, cv::Size(kernelSize, kernelSize), 0, 0);
     cv::GaussianBlur(imageHsv, imageHsv, cv::Size(kernelSize, kernelSize), 0, 0);
     cv::GaussianBlur(imageGray, imageGray, cv::Size(kernelSize, kernelSize), 0, 0);
@@ -89,7 +93,7 @@ void ImageProcessor::process_image(const char* imagePath) {
         return;
     }
 
-    imageRgb = originalImage.clone();
+    set_image_rgb(originalImage.clone());
     cv::cvtColor(originalImage, imageHsv, cv::COLOR_BGR2HSV);
     cv::cvtColor(originalImage, imageGray, cv::COLOR_BGR2GRAY);
 
