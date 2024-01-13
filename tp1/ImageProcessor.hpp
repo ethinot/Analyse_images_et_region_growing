@@ -98,7 +98,8 @@ void ImageProcessor::filter_image_noise(int kernelSize) {
 }
 
 void ImageProcessor::process_image(const char* imagePath) {
-    originalImage = cv::imread(imagePath);
+    originalImage = cv::imread(imagePath, cv::IMREAD_COLOR);
+
     if (!originalImage.data) {
         printf("No image data\n");
         return;
