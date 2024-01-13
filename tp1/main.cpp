@@ -23,68 +23,53 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    bool showEdge = false;
+
+    if(argc > 2) {
+        try {
+            if (std::stoi(argv[2]) != 0) {
+                showEdge = true;
+            }
+        } catch (const std::invalid_argument& ia) {
+            std::cerr << "Invalid argument: " << ia.what() << '\n';
+        } catch (const std::out_of_range& oor) {
+            std::cerr << "Out of Range error: " << oor.what() << '\n';
+        }
+    }
+
+    // Initialisation
+
     ImageProcessor imageProcessor;
     imageProcessor.process_image(argv[1]);
 
-    // Test growing
+    cv::Mat image = imageProcessor.get_image_rgb();
 
-    GrowAndMerge growAndMerge;
-
-    if (argc < 3) {
-        printf("usage: DisplayImage.out <Image_Path> <show_edge (0 or 1)> (<num of seeds>)\n");
-        return -1;
-    }
-
-    if (argc == 4) {
-        std::cout<<"Set the number of seed ... \n";
-        growAndMerge.set_num_seeds(strtol(argv[3], nullptr, 10));
-    }
-
-    GermsPositioningV1 positioningV1;
+    // Germs / seeds positioning
 
     GermsPositioningV2 positioningV2;
 
-    std::vector<cv::Point> seedsV1;
+    std::vector<cv::Point> seeds;
 
-    std::vector<cv::Point> seedsV2;
+    MEASURE_TIME(positioningV2.position_germs(image, 5, seeds)); // the second parameter can be change
 
-    cv::Mat image = imageProcessor.get_image_rgb();
+    // Grow and merge parts
 
-    MEASURE_TIME(positioningV1.generate_seed(seedsV1, image.cols, image.rows, growAndMerge.get_num_seeds()));
-
-    MEASURE_TIME(positioningV2.position_germs(image, 4, seedsV2));
+    GrowAndMerge growAndMerge;
 
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC3);
+    MEASURE_TIME(growAndMerge.rg_seg(image, mask, seeds, showEdge));
 
-    bool showEdge = std::stoi(argv[2]) != 0;
-    MEASURE_TIME(growAndMerge.rg_seg(image, mask, seedsV2, showEdge));
+    // Display solutions
 
     GermsDisplay germsDisplay;
 
     cv::Mat germsAndRegion;
 
-    germsDisplay.display_germs(image, germsAndRegion, seedsV2);
-
+    germsDisplay.display_germs(image, germsAndRegion, seeds);
     germsDisplay.display_segmented_regions(image, germsAndRegion, positioningV2.get_germs_regions(), cv::Scalar(0, 150, 0));
-
-    std::cout << "Nombre de germe V1 : " << seedsV1.size() << std::endl;
-    std::cout << "Nombre de germe V2 : " << seedsV2.size() << std::endl;
 
     cv::imshow("Segmentation", mask);
     cv::imshow("Germs and regions", germsAndRegion);
-
-    cv::Mat original = imageProcessor.get_image_original();
-    cv::Mat rgbFiltered = imageProcessor.get_image_rgb();
-
-    cv::imshow("Original", original);
-    cv::imshow("RGB filtered", rgbFiltered);
-
-    ImageUtil imageUtil;
-    double vO = imageUtil.calculate_variance(original, false);
-    double vF = imageUtil.calculate_variance(rgbFiltered, false);
-
-    std::cout << "Variance original : " << vO << std::endl;
-    std::cout << "Variance filtrer : " << vF << std::endl;
 
     cv::waitKey(0);
     return 0;
