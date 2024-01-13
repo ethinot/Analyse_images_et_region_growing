@@ -418,6 +418,5 @@ void GrowAndMerge::rg_seg(cv::Mat const& src, cv::Mat & dst, std::vector<cv::Poi
     } else {
         fill_mask(buffer, dst);
     }
-
-    std::cout << "Coverage percentage: " << coverage(regions, src.cols, src.rows) << "%" << std::endl;
+    std::cout << "Coverage percentage: " << coverage(regions, src.cols, src.rows) * 100 << "%" << std::endl;
 }
