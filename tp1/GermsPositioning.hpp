@@ -11,6 +11,9 @@
 #include <vector>
 #include <random>
 #include <future>
+#include <mutex>
+
+std::mutex germMutex;
 
 class GermsPositioningV1 {
 private:
@@ -85,6 +88,7 @@ const std::list<SegmentedRegion>& GermsPositioningV2::get_germs_regions() const 
 }
 
 void GermsPositioningV2::add_germ(const cv::Point &topLeft, const cv::Point &bottomRight, double variance) {
+    std::lock_guard<std::mutex> guard(germMutex);
     germsRegions.push_back(SegmentedRegion(topLeft, bottomRight, variance));
 }
 
@@ -136,6 +140,7 @@ void GermsPositioningV2::process_high_variance_region(const cv::Mat &image, cons
     } else {
         // Can divide anymore, add the current region.
         add_germ(topLeft, bottomRight, -1);
+
     }
     iterationCounter--;
 }
@@ -167,19 +172,22 @@ void GermsPositioningV2::divide_image_multithread(const cv::Mat &image, const cv
     cv::Point leftMid = cv::Point(topLeft.x, midY);
     cv::Point midBottom = cv::Point(midX, bottomRight.y);
 
+
+    std::vector<std::thread> threads;
+
     int counter1 = 1, counter2 = 1, counter3 = 1, counter4 = 1;
-    std::thread thread1(&GermsPositioningV2::divide_image, this, std::ref(image), topLeft, mid, iterationLimit, std::ref(counter1));
-    std::thread thread2(&GermsPositioningV2::divide_image, this, std::ref(image), midTop, midRight, iterationLimit, std::ref(counter2));
-    std::thread thread3(&GermsPositioningV2::divide_image, this, std::ref(image), leftMid, midBottom, iterationLimit, std::ref(counter3));
-    std::thread thread4(&GermsPositioningV2::divide_image, this, std::ref(image), mid, bottomRight, iterationLimit, std::ref(counter4));
 
-    thread1.join();
-    thread2.join();
-    thread3.join();
-    thread4.join();
+    threads.push_back(std::move(std::thread(&GermsPositioningV2::divide_image, this, std::ref(image), topLeft, mid, iterationLimit, std::ref(counter1))));
+    threads.push_back(std::move(std::thread(&GermsPositioningV2::divide_image, this, std::ref(image), midTop, midRight, iterationLimit, std::ref(counter2))));
+    threads.push_back(std::move(std::thread(&GermsPositioningV2::divide_image, this, std::ref(image), leftMid, midBottom, iterationLimit, std::ref(counter3))));
+    threads.push_back(std::move(std::thread(&GermsPositioningV2::divide_image, this, std::ref(image), mid, bottomRight, iterationLimit, std::ref(counter4))));
+
+    for (std::thread &t : threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
 }
-
-
 
 void GermsPositioningV2::add_region_germ(std::vector<cv::Point> & seeds) {
     for (const auto& germ : get_germs_regions()) {
