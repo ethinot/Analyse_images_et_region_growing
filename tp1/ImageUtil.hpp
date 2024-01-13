@@ -17,7 +17,7 @@ public:
 
     double calculate_variance(const cv::Mat &, const bool &);
 
-    double calculate_region_variance(const cv::Mat &, cv::Point &, cv::Point &);
+    double calculate_region_variance(const cv::Mat &, const cv::Point &, const cv::Point &);
 
     float pixel_surface(cv::Point, cv::Point) const;
 
@@ -105,7 +105,7 @@ double ImageUtil::calculate_variance(const cv::Mat &image, const bool &isHsv) {
  * @param bottomRight   The bottom-right point of the region.
  * @return The variance of the grayscale region. If the region points are invalid, -1.0 is returned.
  */
-double ImageUtil::calculate_region_variance(const cv::Mat& image, cv::Point & topLeft, cv::Point & bottomRight) {
+double ImageUtil::calculate_region_variance(const cv::Mat& image, const cv::Point & topLeft, const cv::Point & bottomRight) {
     if (topLeft.x < 0 || topLeft.y < 0 || bottomRight.x > image.cols || bottomRight.y > image.rows) {
 
         std::cerr << "Points de région invalides. TopLeft: " << topLeft << ", BottomRight: " << bottomRight << "\n Car :" << image.cols << "--" << image.rows << std::endl;
