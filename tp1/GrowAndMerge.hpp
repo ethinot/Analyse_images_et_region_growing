@@ -351,7 +351,7 @@ bool GrowAndMerge::is_edge(cv::Mat const& buffer, cv::Point const& pixel) {
     if (pixel.y-1 >= 0 && buffer.at<int>(pixel.y-1, pixel.x) != buffer.at<int>(pixel)) {
         return true;    
     }
-    if (pixel.x+1 < buffer.rows && buffer.at<int>(pixel.y+1, pixel.x) != buffer.at<int>(pixel)) {
+    if (pixel.y+1 < buffer.rows && buffer.at<int>(pixel.y+1, pixel.x) != buffer.at<int>(pixel)) {
         return true;
     }
     return false;
