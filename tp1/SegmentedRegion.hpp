@@ -13,7 +13,7 @@ private:
 public:
     SegmentedRegion();
 
-    SegmentedRegion(cv::Point &, cv::Point &, double);
+    SegmentedRegion(const cv::Point &, const cv::Point &, double);
     
     ~SegmentedRegion();
 
@@ -32,7 +32,7 @@ public:
 
 SegmentedRegion::SegmentedRegion() : topLeft(0, 0), bottomRight(0, 0), variance(0.0) { }
 
-SegmentedRegion::SegmentedRegion(cv::Point & _topLeft, cv::Point & _bottomRight, double _variance) : topLeft(_topLeft), bottomRight(_bottomRight), variance(_variance) { }
+SegmentedRegion::SegmentedRegion(const cv::Point & _topLeft, const cv::Point & _bottomRight, double _variance) : topLeft(_topLeft), bottomRight(_bottomRight), variance(_variance) { }
 
 SegmentedRegion::~SegmentedRegion() { }
 
