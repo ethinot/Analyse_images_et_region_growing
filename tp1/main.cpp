@@ -35,15 +35,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    cv::Mat image;
-    image = cv::imread(argv[1], cv::IMREAD_COLOR);
-
-    if (!image.data) {
-        printf("No image data \n");
-        return -1;
-    }
-
     if (argc == 4) {
+        std::cout<<"Set the number of seed ... \n";
         growAndMerge.set_num_seeds(strtol(argv[3], nullptr, 10));
     }
 
@@ -55,6 +48,7 @@ int main(int argc, char** argv) {
 
     std::vector<cv::Point> seedsV2;
 
+    cv::Mat image = imageProcessor.get_image_rgb();
 
     MEASURE_TIME(positioningV1.generate_seed(seedsV1, image.cols, image.rows, growAndMerge.get_num_seeds()));
 
