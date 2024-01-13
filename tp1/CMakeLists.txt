@@ -12,6 +12,7 @@ set(SOURCES
     SegmentedRegion.hpp
     GermsPositioning.hpp
     ImageUtil.hpp
+    GrowAndMerge.hpp
 )
 
 # Create the executable
