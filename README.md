@@ -1,6 +1,7 @@
 # Analyse_image
 
 Ce projet qui explore diverses techniques d'analyse d'image et met en œuvre un outil de segmentation d'image utilisant la technique du région growing. 
+Il a été réalisé dans le cadre de l'UE "Synthés et analyse d'image" du master 1 informatique de l'Université Claude Bernard Lyon 1.
 Les deux parties de ce projet ont été développées en C++ en utilisant la bibliothèque OpenCV.
 
 ## Partie 1 : Techniques d'Analyse d'Image
